@@ -1,9 +1,10 @@
 """Pack generation for cube drafting."""
 
+import itertools
 import random
 from dataclasses import dataclass
 
-from cube_utils.cards import Card, Category
+from cube_utils.cards import Card, Category, categorize_cards
 
 
 @dataclass
@@ -128,9 +129,8 @@ def generate_pack_templates(num_packs: int, pack_size: int) -> list[PackTemplate
             structure.multicolor_range[0], structure.multicolor_range[1]
         )
         # Land is complementary: when multi is high, land is low
-        land_count = (
-            structure.land_range[1]
-            - (multi_count - structure.multicolor_range[0])
+        land_count = structure.land_range[1] - (
+            multi_count - structure.multicolor_range[0]
         )
 
         # Start with 1 per color
@@ -158,6 +158,82 @@ def generate_pack_templates(num_packs: int, pack_size: int) -> list[PackTemplate
     return templates
 
 
+_DEFAULT_GRIDS = 18
+
+
+def generate_grid_templates(
+    *,
+    players: int,
+    categorized: dict[Category, list[Card]],
+    num_grids: int = _DEFAULT_GRIDS,
+) -> list[PackTemplate]:
+    """Generate pool templates for grid drafting.
+
+    Grid drafts use a shared draw pile instead of individual packs. Each grid
+    is 9 cards laid out in a 3x3 arrangement. This function generates one
+    combined template per pool, with category counts summed from individual
+    9-card pack templates.
+
+    Note: For 3-player grids, the first player picks from a 9x9 grid,
+          and then the grid refills to 9 cards for the next player,
+          so we generate 12-card templates to account for the extra cards
+          needed.
+
+    Args:
+        players: Number of players (2, 3, or 4).
+        num_grids: Number of 9-card grids per pool (default 18).
+
+    Returns:
+        List of PackTemplate, one per pool. 2 or 3 players get 1 pool,
+        4 players get 2 pools (parallel grid drafts).
+
+    Raises:
+        ValueError: If players is not 2, 3, or 4.
+    """
+    if players not in (2, 3, 4):
+        raise ValueError(f"Grid draft supports 2, 3, or 4 players, not {players}")
+
+    num_pools = 2 if players == 4 else 1
+    pool_templates: list[PackTemplate] = []
+
+    grid_size = (
+        9 if players != 3 else 12
+    )  # 3-player grids refill after first player picks
+    packs = generate_card_packs(
+        categorized, num_grids * num_pools, grid_size, unseeded=True
+    )
+
+    for i in range(num_pools):
+        # Convert packs to templates and sum them into one pool template
+        packs_for_pool = packs[i * num_grids : (i + 1) * num_grids]
+
+        pool = PackTemplate(
+            white=0,
+            blue=0,
+            black=0,
+            red=0,
+            green=0,
+            colorless=0,
+            multicolor=0,
+            land=0,
+            fixing=0,
+        )
+        for pack in packs_for_pool:
+            categorized_pack = categorize_cards(pack)
+            pool.white += len(categorized_pack[Category.MONO_WHITE])
+            pool.blue += len(categorized_pack[Category.MONO_BLUE])
+            pool.black += len(categorized_pack[Category.MONO_BLACK])
+            pool.red += len(categorized_pack[Category.MONO_RED])
+            pool.green += len(categorized_pack[Category.MONO_GREEN])
+            pool.colorless += len(categorized_pack[Category.COLORLESS])
+            pool.multicolor += len(categorized_pack[Category.MULTICOLOR])
+            pool.land += len(categorized_pack[Category.LAND])
+            pool.fixing += len(categorized_pack[Category.FIXING])
+        pool_templates.append(pool)
+
+    return pool_templates
+
+
 _CATEGORY_FOR_COLOR = {
     "white": Category.MONO_WHITE,
     "blue": Category.MONO_BLUE,
@@ -171,6 +247,7 @@ def generate_card_packs(
     categorized: dict[Category, list[Card]],
     num_packs: int,
     pack_size: int,
+    unseeded: bool,
 ) -> list[list[Card]]:
     """Generate draft packs filled with actual cards.
 
@@ -178,6 +255,7 @@ def generate_card_packs(
         categorized: Dict mapping Category to list of Card (from categorize_cards).
         num_packs: Number of packs to generate.
         pack_size: Cards per pack (9, 11, or 15).
+        unseeded: Should packs be fully random?
 
     Returns:
         List of packs, where each pack is a list of Card.
@@ -185,6 +263,8 @@ def generate_card_packs(
     Raises:
         ValueError: If there are not enough cards to fill all packs.
     """
+    packs: list[list[Card]] = []
+
     # Copy and shuffle pools so we don't modify the original
     pools: dict[Category, list[Card]] = {}
     for cat, cards in categorized.items():
@@ -192,53 +272,63 @@ def generate_card_packs(
         random.shuffle(pool)
         pools[cat] = pool
 
-    templates = generate_pack_templates(num_packs, pack_size)
+    if not unseeded:
+        templates = generate_pack_templates(num_packs, pack_size)
 
-    # Check we have enough cards in each category across all templates
-    needed: dict[Category, int] = {cat: 0 for cat in Category}
-    for t in templates:
-        for color_attr in _COLOR_ATTRS:
-            needed[_CATEGORY_FOR_COLOR[color_attr]] += getattr(t, color_attr)
-        needed[Category.COLORLESS] += t.colorless
-        needed[Category.MULTICOLOR] += t.multicolor
-        needed[Category.LAND] += t.land
-        needed[Category.FIXING] += t.fixing
+        # Check we have enough cards in each category across all templates
+        needed: dict[Category, int] = {cat: 0 for cat in Category}
+        for t in templates:
+            for color_attr in _COLOR_ATTRS:
+                needed[_CATEGORY_FOR_COLOR[color_attr]] += getattr(t, color_attr)
+            needed[Category.COLORLESS] += t.colorless
+            needed[Category.MULTICOLOR] += t.multicolor
+            needed[Category.LAND] += t.land
+            needed[Category.FIXING] += t.fixing
 
-    for cat, count in needed.items():
-        available = len(pools.get(cat, []))
-        if count > available:
-            raise ValueError(
-                f"Not enough {cat.value} cards: need {count}, have {available}"
+        for cat, count in needed.items():
+            available = len(pools.get(cat, []))
+            if count > available:
+                raise ValueError(
+                    f"Not enough {cat.value} cards: need {count}, have {available}"
+                )
+
+        # Draw cards into packs
+        packs: list[list[Card]] = []
+        for template in templates:
+            pack: list[Card] = []
+
+            # Draw mono-colored cards
+            for color_attr in _COLOR_ATTRS:
+                cat = _CATEGORY_FOR_COLOR[color_attr]
+                count = getattr(template, color_attr)
+                for _ in range(count):
+                    pack.append(pools[cat].pop())
+
+            # Draw colorless
+            for _ in range(template.colorless):
+                pack.append(pools[Category.COLORLESS].pop())
+
+            # Draw multicolor
+            for _ in range(template.multicolor):
+                pack.append(pools[Category.MULTICOLOR].pop())
+
+            # Draw land
+            for _ in range(template.land):
+                pack.append(pools[Category.LAND].pop())
+
+            # Draw fixing
+            for _ in range(template.fixing):
+                pack.append(pools[Category.FIXING].pop())
+
+            packs.append(pack)
+    else:
+        full_pool = list(itertools.chain.from_iterable(pools.values()))
+        random.shuffle(full_pool)
+        packs = [
+            list(batch)
+            for batch in itertools.batched(
+                full_pool[: pack_size * num_packs], pack_size, strict=True
             )
-
-    # Draw cards into packs
-    packs: list[list[Card]] = []
-    for template in templates:
-        pack: list[Card] = []
-
-        # Draw mono-colored cards
-        for color_attr in _COLOR_ATTRS:
-            cat = _CATEGORY_FOR_COLOR[color_attr]
-            count = getattr(template, color_attr)
-            for _ in range(count):
-                pack.append(pools[cat].pop())
-
-        # Draw colorless
-        for _ in range(template.colorless):
-            pack.append(pools[Category.COLORLESS].pop())
-
-        # Draw multicolor
-        for _ in range(template.multicolor):
-            pack.append(pools[Category.MULTICOLOR].pop())
-
-        # Draw land
-        for _ in range(template.land):
-            pack.append(pools[Category.LAND].pop())
-
-        # Draw fixing
-        for _ in range(template.fixing):
-            pack.append(pools[Category.FIXING].pop())
-
-        packs.append(pack)
+        ]
 
     return packs

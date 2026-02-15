@@ -1,9 +1,17 @@
 pyproject.toml
 src/cube_utils/__init__.py
+src/cube_utils/cards.py
 src/cube_utils/cli.py
+src/cube_utils/guide.py
+src/cube_utils/packs.py
+src/cube_utils/tags.py
 src/cube_utils.egg-info/PKG-INFO
 src/cube_utils.egg-info/SOURCES.txt
 src/cube_utils.egg-info/dependency_links.txt
 src/cube_utils.egg-info/entry_points.txt
 src/cube_utils.egg-info/requires.txt
 src/cube_utils.egg-info/top_level.txt
+tests/test_cards.py
+tests/test_guide.py
+tests/test_packs.py
+tests/test_tags.py

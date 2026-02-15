@@ -13,6 +13,7 @@ from cube_utils.packs import (
     PackStructure,
     PackTemplate,
     generate_card_packs,
+    generate_grid_templates,
     generate_pack_templates,
     get_pack_structure,
 )
@@ -413,3 +414,105 @@ class TestPacksCLI:
         # Files should contain card names
         content = files[0].read_text()
         assert "Card" in content or "Gold" in content or "Land" in content
+
+
+# ---------------------------------------------------------------------------
+# Grid Draft Templates
+# ---------------------------------------------------------------------------
+
+
+class TestGenerateGridTemplates:
+    """Tests for generate_grid_templates."""
+
+    def test_2_players_returns_one_pool(self):
+        pools = generate_grid_templates(players=2)
+        assert len(pools) == 1
+
+    def test_3_players_returns_one_pool(self):
+        pools = generate_grid_templates(players=3)
+        assert len(pools) == 1
+
+    def test_4_players_returns_two_pools(self):
+        pools = generate_grid_templates(players=4)
+        assert len(pools) == 2
+
+    def test_pool_total_equals_grids_times_9(self):
+        pools = generate_grid_templates(players=2, num_grids=18)
+        assert pools[0].total() == 18 * 9
+
+    def test_custom_grid_count(self):
+        pools = generate_grid_templates(players=2, num_grids=12)
+        assert pools[0].total() == 12 * 9
+
+    def test_each_color_at_least_num_grids(self):
+        """Each color should have at least 1 card per grid (from the 9-card structure)."""
+        pools = generate_grid_templates(players=2, num_grids=18)
+        pool = pools[0]
+        for attr in ["white", "blue", "black", "red", "green"]:
+            assert getattr(pool, attr) >= 18
+
+    def test_4_players_pools_are_independent(self):
+        """Two pools for 4 players should each have the right total."""
+        pools = generate_grid_templates(players=4, num_grids=18)
+        assert pools[0].total() == 162
+        assert pools[1].total() == 162
+
+    def test_invalid_player_count(self):
+        with pytest.raises(ValueError, match="2, 3, or 4"):
+            generate_grid_templates(players=5)
+
+
+class TestGridCLI:
+    """Tests for the --grid CLI flag."""
+
+    @pytest.fixture()
+    def csv_path(self, tmp_path):
+        """Create a CSV with enough cards for grid draft."""
+        p = tmp_path / "cube.csv"
+        rows = [["quantity", "card name", "color", "cmc", "scryfall ID", "types", "card text"]]
+        idx = 0
+        for color in ["White", "Blue", "Black", "Red", "Green"]:
+            for i in range(40):
+                rows.append([1, f"{color} Card {i}", color, 2, f"id-{idx}", "Creature", ""])
+                idx += 1
+        for i in range(30):
+            rows.append([1, f"Gold {i}", "White,Blue", 3, f"id-{idx}", "Creature", "multi"])
+            idx += 1
+        for i in range(30):
+            rows.append([1, f"Land {i}", "", 0, f"id-{idx}", "Land", ""])
+            idx += 1
+        for i in range(15):
+            rows.append([1, f"Fixer {i}", "", 1, f"id-{idx}", "Artifact", "add one mana of any color"])
+            idx += 1
+        for i in range(15):
+            rows.append([1, f"Artifact {i}", "", 2, f"id-{idx}", "Artifact", "vanilla"])
+            idx += 1
+        with open(p, "w", newline="") as f:
+            csv.writer(f).writerows(rows)
+        return p
+
+    def test_grid_2_players(self, csv_path):
+        runner = CliRunner()
+        result = runner.invoke(main, ["packs", "--cube", str(csv_path), "--grid", "--players", "2"])
+        assert result.exit_code == 0
+        assert "Grid draft: 2 players" in result.output
+        assert "Draw pile:" in result.output
+        assert "162 cards" in result.output or "162 total" in result.output
+
+    def test_grid_4_players(self, csv_path):
+        runner = CliRunner()
+        result = runner.invoke(main, ["packs", "--cube", str(csv_path), "--grid", "--players", "4"])
+        assert result.exit_code == 0
+        assert "Pool 1:" in result.output
+        assert "Pool 2:" in result.output
+
+    def test_grid_custom_grids(self, csv_path):
+        runner = CliRunner()
+        result = runner.invoke(main, ["packs", "--cube", str(csv_path), "--grid", "--players", "2", "--grids", "12"])
+        assert result.exit_code == 0
+        assert "12 grids" in result.output
+
+    def test_grid_invalid_players(self, csv_path):
+        runner = CliRunner()
+        result = runner.invoke(main, ["packs", "--cube", str(csv_path), "--grid", "--players", "5"])
+        assert result.exit_code != 0

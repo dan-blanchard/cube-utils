@@ -17,6 +17,7 @@ from cube_utils.guide import (
 )
 from cube_utils.packs import (
     generate_card_packs,
+    generate_grid_templates,
     generate_pack_templates,
     get_pack_structure,
 )
@@ -120,13 +121,44 @@ def main():
     help="Show actual card names instead of category counts.",
 )
 @click.option(
+    "--grid",
+    "grid_mode",
+    is_flag=True,
+    default=False,
+    help="Generate category counts for grid draft pools instead of individual packs.",
+)
+@click.option(
+    "--grids",
+    "num_grids",
+    default=18,
+    type=int,
+    help="Number of 9-card grids per pool for grid draft (default 18).",
+)
+@click.option(
     "--output-dir",
     "output_dir",
     default=None,
     type=click.Path(),
     help="Write one file per player to this directory.",
 )
-def packs(cube_path, players, num_packs, pack_size, cards_mode, output_dir):
+@click.option(
+    "--unseeded",
+    "unseeded",
+    is_flag=True,
+    default=False,
+    help="Generate fully random packs",
+)
+def packs(
+    cube_path,
+    players,
+    num_packs,
+    pack_size,
+    cards_mode,
+    grid_mode,
+    num_grids,
+    output_dir,
+    unseeded,
+):
     """Generate draft packs."""
     # Validate pack size
     try:
@@ -145,9 +177,15 @@ def packs(cube_path, players, num_packs, pack_size, cards_mode, output_dir):
             f"Not enough cards: need {total_cards_needed} but cube has {len(cards)}"
         )
 
+    if grid_mode:
+        _handle_grid_draft(players, num_grids, categorized)
+        return
+
     if cards_mode:
         try:
-            all_packs = generate_card_packs(categorized, total_packs, pack_size)
+            all_packs = generate_card_packs(
+                categorized, total_packs, pack_size, unseeded
+            )
         except ValueError as e:
             raise click.ClickException(str(e))
 
@@ -182,12 +220,38 @@ def packs(cube_path, players, num_packs, pack_size, cards_mode, output_dir):
         for player_idx in range(players):
             player_file = out_path / f"player-{player_idx + 1}.txt"
             # Extract just this player's section
-            player_file.write_text(
-                output_parts[player_idx] + "\n", encoding="utf-8"
-            )
+            player_file.write_text(output_parts[player_idx] + "\n", encoding="utf-8")
         click.echo(f"Wrote {players} player files to {output_dir}")
     else:
         click.echo(output_text, nl=False)
+
+
+def _handle_grid_draft(players, num_grids, categorized):
+    """Handle --grid mode: print category counts for grid draft pools."""
+
+    try:
+        pool_templates = generate_grid_templates(
+            players=players, num_grids=num_grids, categorized=categorized
+        )
+    except ValueError as e:
+        raise click.ClickException(str(e))
+
+    num_pools = len(pool_templates)
+    cards_per_pool = pool_templates[0].total()
+    total_needed = cards_per_pool * num_pools
+
+    click.echo(
+        f"Grid draft: {players} players, {num_grids} grids per pool, "
+        f"{cards_per_pool} cards per pool ({total_needed} total)"
+    )
+    click.echo()
+
+    if num_pools == 1:
+        pool = pool_templates[0]
+        click.echo(f"Draw pile: {_format_template(pool)}")
+    else:
+        for i, pool in enumerate(pool_templates, 1):
+            click.echo(f"Pool {i}: {_format_template(pool)}")
 
 
 @main.command("fetch-tags")
@@ -204,7 +268,9 @@ def fetch_tags_cmd(output_path):
     cache = fetch_tags(cache_path=Path(output_path))
     tag_counts = {tag: len(ids) for tag, ids in cache["tags"].items()}
     total = sum(tag_counts.values())
-    click.echo(f"Cached {len(tag_counts)} tags ({total} total oracle IDs) to {output_path}")
+    click.echo(
+        f"Cached {len(tag_counts)} tags ({total} total oracle IDs) to {output_path}"
+    )
     for tag, count in sorted(tag_counts.items()):
         click.echo(f"  {tag}: {count} cards")
 
