@@ -7,6 +7,7 @@ from cube_utils.guide import (
     analyze_color_pairs,
     detect_themes,
     find_bridge_cards,
+    generate_guide_markdown,
 )
 
 
@@ -224,3 +225,86 @@ class TestFindBridgeCards:
         bridges = find_bridge_cards(themes)
         names = [c.name for c in bridges]
         assert names == sorted(names)
+
+
+# --- Task 7: Guide Markdown Output ---
+
+
+class TestGenerateGuideMarkdown:
+    """Tests for generate_guide_markdown."""
+
+    def _build_guide_data(self):
+        """Create a small set of cards and run the full pipeline."""
+        sacrifice_card = _make_card(
+            name="Viscera Seer",
+            colors=["Black"],
+            text="Sacrifice a creature: Scry 1.",
+        )
+        heroic_white = _make_card(
+            name="Favored Hoplite",
+            colors=["White"],
+            text="Heroic",
+            keywords=["Heroic"],
+        )
+        heroic_red = _make_card(
+            name="Satyr Hoplite",
+            colors=["Red"],
+            text="Heroic",
+            keywords=["Heroic"],
+        )
+        gold = _make_card(
+            name="Anax and Cymede",
+            colors=["White", "Red"],
+            text="Heroic",
+            keywords=["Heroic"],
+        )
+        bridge = _make_card(
+            name="Arcbound Ravager",
+            colors=[],
+            types=["Artifact", "Creature"],
+            text="Sacrifice an artifact: Put a +1/+1 counter on Arcbound Ravager.",
+        )
+        cards = [sacrifice_card, heroic_white, heroic_red, gold, bridge]
+        themes = detect_themes(cards)
+        pairs = analyze_color_pairs(cards, themes)
+        bridges = find_bridge_cards(themes)
+        return themes, pairs, bridges, cards
+
+    def test_has_main_heading(self):
+        themes, pairs, bridges, _ = self._build_guide_data()
+        md = generate_guide_markdown(themes, pairs, bridges)
+        assert "# Draft Guide Skeleton" in md
+
+    def test_has_themes_section(self):
+        themes, pairs, bridges, _ = self._build_guide_data()
+        md = generate_guide_markdown(themes, pairs, bridges)
+        assert "## Themes" in md
+
+    def test_has_color_pairs_section(self):
+        themes, pairs, bridges, _ = self._build_guide_data()
+        md = generate_guide_markdown(themes, pairs, bridges)
+        assert "## Color Pairs" in md
+
+    def test_has_bridge_cards_section(self):
+        themes, pairs, bridges, _ = self._build_guide_data()
+        md = generate_guide_markdown(themes, pairs, bridges)
+        assert "## Bridge Cards" in md
+
+    def test_lists_card_names(self):
+        themes, pairs, bridges, _ = self._build_guide_data()
+        md = generate_guide_markdown(themes, pairs, bridges)
+        assert "Viscera Seer" in md
+        assert "Favored Hoplite" in md
+        assert "Anax and Cymede" in md
+        assert "Arcbound Ravager" in md
+
+    def test_bridge_card_lists_themes(self):
+        themes, pairs, bridges, _ = self._build_guide_data()
+        md = generate_guide_markdown(themes, pairs, bridges)
+        # Arcbound Ravager should be listed as a bridge with its themes
+        assert "**Arcbound Ravager**" in md
+
+    def test_guild_name_appears(self):
+        themes, pairs, bridges, _ = self._build_guide_data()
+        md = generate_guide_markdown(themes, pairs, bridges)
+        assert "Boros" in md

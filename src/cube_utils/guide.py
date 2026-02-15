@@ -283,3 +283,123 @@ def find_bridge_cards(themes: dict[Theme, list[Card]]) -> list[Card]:
         if count >= 2
     ]
     return sorted(bridges, key=lambda c: c.name)
+
+
+# --- Guide Markdown Output ---
+
+
+def _get_guild_name(pair: tuple[str, str]) -> str:
+    """Get the guild name for a color pair."""
+    key = tuple(sorted(pair))
+    return _GUILD_NAMES.get(key, f"{pair[0]}/{pair[1]}")
+
+
+def _get_color_abbrev(color: str) -> str:
+    """Get the single-letter abbreviation for a color."""
+    return _COLOR_ABBREV.get(color, color[0])
+
+
+def _themes_for_card(card: Card, themes: dict[Theme, list[Card]]) -> list[Theme]:
+    """Return the list of themes a card belongs to."""
+    return [theme for theme, cards in themes.items() if card in cards]
+
+
+def generate_guide_markdown(
+    themes: dict[Theme, list[Card]],
+    pairs: list[ColorPairAnalysis],
+    bridges: list[Card],
+) -> str:
+    """Generate a draft guide skeleton in Markdown format.
+
+    Args:
+        themes: Dict of detected themes.
+        pairs: List of color pair analyses.
+        bridges: List of bridge cards.
+
+    Returns:
+        Markdown string with the complete draft guide.
+    """
+    lines: list[str] = []
+
+    lines.append("# Draft Guide Skeleton")
+    lines.append("")
+
+    # Themes section
+    lines.append("## Themes")
+    lines.append("")
+    for theme in Theme:
+        theme_cards = themes.get(theme, [])
+        if not theme_cards:
+            continue
+        lines.append(f"### {theme.name.replace('_', ' ').title()}")
+        lines.append("")
+
+        # Group cards by color
+        color_groups: dict[str, list[Card]] = {}
+        for card in theme_cards:
+            if card.is_multicolor:
+                key = "/".join(
+                    _get_color_abbrev(c) for c in sorted(card.colors)
+                )
+            elif card.is_colorless:
+                key = "Colorless"
+            else:
+                key = card.colors[0] if card.colors else "Colorless"
+            color_groups.setdefault(key, []).append(card)
+
+        for color_key in sorted(color_groups.keys()):
+            lines.append(
+                f"**{color_key}:** "
+                f"{', '.join(c.name for c in color_groups[color_key])}"
+            )
+            lines.append("")
+
+    # Color Pairs section
+    lines.append("## Color Pairs")
+    lines.append("")
+    for pair_analysis in pairs:
+        guild = _get_guild_name(pair_analysis.colors)
+        abbrevs = "/".join(
+            _get_color_abbrev(c) for c in pair_analysis.colors
+        )
+        lines.append(f"### {guild} ({abbrevs})")
+        lines.append("")
+
+        if pair_analysis.multicolor_cards:
+            gold_names = ", ".join(
+                c.name for c in pair_analysis.multicolor_cards
+            )
+            lines.append(f"**Gold cards:** {gold_names}")
+            lines.append("")
+
+        if pair_analysis.shared_themes:
+            theme_names = ", ".join(
+                t.name.replace("_", " ").title()
+                for t in pair_analysis.shared_themes
+            )
+            lines.append(f"**Shared themes:** {theme_names}")
+            lines.append("")
+
+            for theme in pair_analysis.shared_themes:
+                cards_for_theme = pair_analysis.theme_cards.get(theme, [])
+                if cards_for_theme:
+                    card_names = ", ".join(c.name for c in cards_for_theme)
+                    lines.append(
+                        f"- {theme.name.replace('_', ' ').title()}: "
+                        f"{card_names}"
+                    )
+            lines.append("")
+
+    # Bridge Cards section
+    lines.append("## Bridge Cards")
+    lines.append("")
+    if bridges:
+        for card in bridges:
+            card_themes = _themes_for_card(card, themes)
+            theme_names = ", ".join(
+                t.name.replace("_", " ").title() for t in card_themes
+            )
+            lines.append(f"- **{card.name}**: {theme_names}")
+        lines.append("")
+
+    return "\n".join(lines)
