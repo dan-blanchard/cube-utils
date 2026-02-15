@@ -8,25 +8,18 @@ from pathlib import Path
 import requests
 
 RELEVANT_TAGS = [
-    "removal",
     "board-wipe",
-    "counterspell",
     "bounce",
-    "ramp",
-    "mana-dork",
-    "card-advantage",
-    "draw",
-    "sacrifice-outlet",
-    "recursion",
-    "flicker",
-    "blink",
-    "evasion",
     "burn",
-    "tutor",
-    "lifegain",
     "discard-outlet",
+    "evasion",
+    "flicker",
     "landfall",
-    "token-maker",
+    "mana-dork",
+    "ramp",
+    "recursion",
+    "removal",
+    "sacrifice-outlet",
 ]
 
 SCRYFALL_SEARCH_URL = "https://api.scryfall.com/cards/search"
@@ -55,6 +48,8 @@ def _fetch_tag_oracle_ids(tag: str, session: requests.Session) -> list[str]:
     while True:
         time.sleep(RATE_LIMIT_DELAY)
         resp = session.get(url, params=params)
+        if resp.status_code == 404:
+            break  # Tag doesn't exist on Scryfall
         resp.raise_for_status()
         data = resp.json()
 

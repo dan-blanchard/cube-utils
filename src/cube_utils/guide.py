@@ -36,19 +36,14 @@ class Theme(Enum):
 # - "text": Card text patterns -- fallback for cube-specific themes
 THEME_PATTERNS: dict[Theme, dict[str, list[str]]] = {
     Theme.REMOVAL: {
-        "tags": ["removal", "board-wipe", "burn"],
+        "tags": ["removal", "board-wipe", "burn", "bounce"],
         "keywords": [],
         "text": [],
     },
     Theme.SACRIFICE: {
         "tags": ["sacrifice-outlet"],
         "keywords": [],
-        "text": [
-            "when this creature dies",
-            "whenever a creature dies",
-            "whenever a creature you control dies",
-            "whenever a nontoken creature you control dies",
-        ],
+        "text": [],
     },
     Theme.COUNTERS: {
         "tags": [],
@@ -75,9 +70,14 @@ THEME_PATTERNS: dict[Theme, dict[str, list[str]]] = {
         ],
     },
     Theme.TOKENS: {
-        "tags": ["token-maker"],
+        "tags": [],
         "keywords": [],
-        "text": [],
+        "text": [
+            "creature token",
+            "artifact token",
+            "create a",
+            "create two",
+        ],
     },
     Theme.ARTIFACTS: {
         "tags": [],
@@ -90,7 +90,7 @@ THEME_PATTERNS: dict[Theme, dict[str, list[str]]] = {
         ],
     },
     Theme.BLINK: {
-        "tags": ["flicker", "blink"],
+        "tags": ["flicker"],
         "keywords": [],
         "text": [],
     },
@@ -107,45 +107,32 @@ THEME_PATTERNS: dict[Theme, dict[str, list[str]]] = {
     Theme.CYCLING: {
         "tags": ["discard-outlet"],
         "keywords": ["Cycling"],
-        "text": [
-            "cycling",
-            "whenever you cycle",
-            "whenever you discard",
-        ],
+        "text": [],
     },
     Theme.EQUIPMENT: {
         "tags": [],
         "keywords": ["Equip"],
-        "text": ["equip ", "equipped creature", "attach"],
+        "text": ["equipped creature"],
     },
     Theme.GRAVEYARD: {
         "tags": ["recursion"],
         "keywords": ["Escape", "Embalm", "Unearth", "Flashback"],
-        "text": [
-            "escape",
-            "embalm",
-            "unearth",
-            "flashback",
-        ],
+        "text": [],
     },
     Theme.AGGRO: {
         "tags": [],
         "keywords": ["Haste"],
-        "text": ["can't block", "attacks each combat if able"],
+        "text": [],
     },
     Theme.RAMP: {
         "tags": ["ramp", "mana-dork"],
         "keywords": [],
-        "text": [
-            "search your library for a basic land",
-            "add one mana",
-            "mana of any color",
-        ],
+        "text": [],
     },
     Theme.EVASION: {
         "tags": ["evasion"],
-        "keywords": ["Flying", "Menace", "Shadow"],
-        "text": ["can't be blocked"],
+        "keywords": [],
+        "text": [],
     },
 }
 

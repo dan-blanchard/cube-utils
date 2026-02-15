@@ -62,19 +62,18 @@ class TestDetectThemes:
         themes = detect_themes([card])
         assert card in themes[Theme.SACRIFICE]
 
-    def test_detect_sacrifice_via_death_trigger(self):
-        """Death-trigger payoffs should also be in sacrifice theme."""
+    def test_sacrifice_not_triggered_by_text(self):
+        """Sacrifice theme uses otag only -- death trigger text should not match."""
         card = _make_card(
             name="Blood Artist",
             colors=["Black"],
             text="Whenever a creature dies, target player loses 1 life and you gain 1 life.",
         )
         themes = detect_themes([card])
-        assert card in themes[Theme.SACRIFICE]
+        assert card not in themes[Theme.SACRIFICE]
 
     def test_sacrifice_not_triggered_by_cost(self):
-        """A card that only mentions 'sacrifice' as a cost (not as a theme) should not match
-        unless it has the sacrifice-outlet tag or death-trigger text."""
+        """A card that only mentions 'sacrifice' as a cost should not match."""
         card = _make_card(
             name="Random Fetch Land",
             colors=[],
@@ -88,7 +87,7 @@ class TestDetectThemes:
         card = _make_card(
             name="Raise the Alarm",
             colors=["White"],
-            functional_tags=["token-maker"],
+            text="Create two 1/1 white Soldier creature tokens.",
         )
         themes = detect_themes([card])
         assert card in themes[Theme.TOKENS]
@@ -160,7 +159,8 @@ class TestDetectThemes:
         themes = detect_themes([card])
         assert card in themes[Theme.GRAVEYARD]
 
-    def test_detect_evasion_via_keyword(self):
+    def test_evasion_keyword_alone_not_enough(self):
+        """Evasion uses otag only -- keywords alone should not match."""
         card = _make_card(
             name="Serra Angel",
             colors=["White"],
@@ -168,7 +168,7 @@ class TestDetectThemes:
             keywords=["Flying", "Vigilance"],
         )
         themes = detect_themes([card])
-        assert card in themes[Theme.EVASION]
+        assert card not in themes[Theme.EVASION]
 
     def test_detect_aggro_via_keyword(self):
         card = _make_card(
