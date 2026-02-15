@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from cube_utils.cards import Card, load_cube
+from cube_utils.cards import Card, Category, categorize_cards, load_cube
 
 
 class TestCard:
@@ -206,3 +206,94 @@ class TestLoadCube:
             assert "Card" not in card.types, f"{card.name} is a Card type"
         # Should have roughly 442 draftable cards (465 - 23 non-draftable)
         assert len(cards) > 400
+
+
+class TestCategorizeCards:
+    """Tests for the categorize_cards function."""
+
+    def _make_card(self, name="Test", colors=None, types=None, text=""):
+        return Card(
+            name=name,
+            colors=colors or [],
+            cmc=1,
+            scryfall_id="abc",
+            types=types or ["Creature"],
+            text=text,
+        )
+
+    def test_mono_white(self):
+        card = self._make_card(colors=["White"])
+        result = categorize_cards([card])
+        assert result[Category.MONO_WHITE] == [card]
+
+    def test_mono_blue(self):
+        card = self._make_card(colors=["Blue"])
+        result = categorize_cards([card])
+        assert result[Category.MONO_BLUE] == [card]
+
+    def test_mono_black(self):
+        card = self._make_card(colors=["Black"])
+        result = categorize_cards([card])
+        assert result[Category.MONO_BLACK] == [card]
+
+    def test_mono_red(self):
+        card = self._make_card(colors=["Red"])
+        result = categorize_cards([card])
+        assert result[Category.MONO_RED] == [card]
+
+    def test_mono_green(self):
+        card = self._make_card(colors=["Green"])
+        result = categorize_cards([card])
+        assert result[Category.MONO_GREEN] == [card]
+
+    def test_multicolor(self):
+        card = self._make_card(colors=["White", "Red"])
+        result = categorize_cards([card])
+        assert result[Category.MULTICOLOR] == [card]
+
+    def test_land(self):
+        card = self._make_card(types=["Land"])
+        result = categorize_cards([card])
+        assert result[Category.LAND] == [card]
+
+    def test_fixing_mana_of_any_color(self):
+        card = self._make_card(
+            types=["Artifact"],
+            text="Add one mana of any color.",
+        )
+        result = categorize_cards([card])
+        assert result[Category.FIXING] == [card]
+
+    def test_fixing_search_basic_land(self):
+        card = self._make_card(
+            types=["Artifact"],
+            text="Search your library for a basic land card.",
+        )
+        result = categorize_cards([card])
+        assert result[Category.FIXING] == [card]
+
+    def test_fixing_add_one_mana(self):
+        card = self._make_card(
+            types=["Artifact"],
+            text="Add one mana of the chosen color.",
+        )
+        result = categorize_cards([card])
+        assert result[Category.FIXING] == [card]
+
+    def test_colorless(self):
+        card = self._make_card(
+            types=["Artifact"],
+            text="Equipped creature gets +1/+1.",
+        )
+        result = categorize_cards([card])
+        assert result[Category.COLORLESS] == [card]
+
+    def test_every_card_categorized_exactly_once(self, sample_csv):
+        cards = load_cube(sample_csv)
+        result = categorize_cards(cards)
+        all_categorized = []
+        for cat_cards in result.values():
+            all_categorized.extend(cat_cards)
+        assert len(all_categorized) == len(cards)
+        # No duplicates
+        assert len(set(id(c) for c in all_categorized)) == len(cards)

@@ -1,8 +1,38 @@
 """Card data model and cube CSV loading."""
 
 import csv
+import re
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
+
+
+class Category(Enum):
+    """Draft pool categories for card organization."""
+
+    MONO_WHITE = "mono_white"
+    MONO_BLUE = "mono_blue"
+    MONO_BLACK = "mono_black"
+    MONO_RED = "mono_red"
+    MONO_GREEN = "mono_green"
+    MULTICOLOR = "multicolor"
+    LAND = "land"
+    FIXING = "fixing"
+    COLORLESS = "colorless"
+
+
+_COLOR_TO_CATEGORY = {
+    "White": Category.MONO_WHITE,
+    "Blue": Category.MONO_BLUE,
+    "Black": Category.MONO_BLACK,
+    "Red": Category.MONO_RED,
+    "Green": Category.MONO_GREEN,
+}
+
+_FIXING_PATTERNS = re.compile(
+    r"mana of any color|search your library for a basic land|add one mana",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -83,3 +113,32 @@ def load_cube(path: Path) -> list[Card]:
                 cards.append(card)
 
     return cards
+
+
+def categorize_cards(cards: list[Card]) -> dict[Category, list[Card]]:
+    """Assign each card to exactly one draft pool category.
+
+    Args:
+        cards: List of draftable cards.
+
+    Returns:
+        Dict mapping each Category to its list of cards.
+    """
+    result: dict[Category, list[Card]] = {cat: [] for cat in Category}
+
+    for card in cards:
+        if card.is_multicolor:
+            result[Category.MULTICOLOR].append(card)
+        elif card.is_land:
+            result[Category.LAND].append(card)
+        elif card.is_colorless and _FIXING_PATTERNS.search(card.text):
+            result[Category.FIXING].append(card)
+        elif card.is_colorless:
+            result[Category.COLORLESS].append(card)
+        else:
+            # Single color
+            cat = _COLOR_TO_CATEGORY.get(card.colors[0])
+            if cat:
+                result[cat].append(card)
+
+    return result
