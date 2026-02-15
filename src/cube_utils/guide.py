@@ -13,148 +13,190 @@ from cube_utils.cards import Card
 class Theme(Enum):
     """Detectable draft themes/archetypes."""
 
+    REMOVAL = "removal"
     SACRIFICE = "sacrifice"
-    COUNTERS = "counters"
-    ETB = "etb"
-    SPELLS_MATTER = "spells_matter"
+    COUNTERS = "+1/+1 counters"
+    ETB = "enters the battlefield"
+    SPELLS_MATTER = "spells matter"
     TOKENS = "tokens"
-    ARTIFACTS = "artifacts"
-    BLINK = "blink"
-    HEROIC = "heroic"
-    CYCLING = "cycling"
+    ARTIFACTS = "artifacts matter"
+    BLINK = "blink/flicker"
+    HEROIC = "heroic/targeting"
+    CYCLING = "cycling/discard"
     EQUIPMENT = "equipment"
     GRAVEYARD = "graveyard"
     AGGRO = "aggro"
-    EVASION = "evasion"
     RAMP = "ramp"
+    EVASION = "evasion"
 
 
+# Theme detection rules: each theme has three layers of detection.
+# - "tags": Scryfall oracle tags (functional_tags on Card) -- primary signal
+# - "keywords": Scryfall keyword abilities -- secondary signal
+# - "text": Card text patterns -- fallback for cube-specific themes
 THEME_PATTERNS: dict[Theme, dict[str, list[str]]] = {
+    Theme.REMOVAL: {
+        "tags": ["removal", "board-wipe", "burn"],
+        "keywords": [],
+        "text": [],
+    },
     Theme.SACRIFICE: {
+        "tags": ["sacrifice-outlet"],
+        "keywords": [],
         "text": [
-            "sacrifice a",
-            "sacrifice this",
             "when this creature dies",
             "whenever a creature dies",
             "whenever a creature you control dies",
+            "whenever a nontoken creature you control dies",
         ],
-        "keywords": [],
     },
     Theme.COUNTERS: {
-        "text": ["+1/+1 counter", "modular", "-1/-1 counter"],
+        "tags": [],
         "keywords": [],
+        "text": ["+1/+1 counter", "modular", "-1/-1 counter"],
     },
     Theme.ETB: {
+        "tags": [],
+        "keywords": [],
         "text": [
             "when this creature enters",
             "when this artifact enters",
             "when this enchantment enters",
             "when it enters",
-            "enters the battlefield",
-            "enters, ",
         ],
-        "keywords": [],
     },
     Theme.SPELLS_MATTER: {
+        "tags": [],
+        "keywords": ["Prowess"],
         "text": [
             "noncreature spell",
             "instant or sorcery",
-            "prowess",
             "magecraft",
         ],
-        "keywords": ["Prowess"],
     },
     Theme.TOKENS: {
-        "text": ["create a", "create two", "creature token", "artifact token"],
+        "tags": ["token-maker"],
         "keywords": [],
+        "text": [],
     },
     Theme.ARTIFACTS: {
+        "tags": [],
+        "keywords": [],
         "text": [
             "artifact you control",
             "target artifact",
             "historic",
             "whenever you cast an artifact",
         ],
-        "keywords": [],
     },
     Theme.BLINK: {
-        "text": [
-            "exile target creature you control, then return",
-            "exile it, then return",
-            "flicker",
-        ],
+        "tags": ["flicker", "blink"],
         "keywords": [],
+        "text": [],
     },
     Theme.HEROIC: {
+        "tags": [],
+        "keywords": ["Heroic"],
         "text": [
             "heroic",
             "whenever you cast a spell that targets",
             "target creature you control gets",
             "target creature gets +",
         ],
-        "keywords": ["Heroic"],
     },
     Theme.CYCLING: {
+        "tags": ["discard-outlet"],
+        "keywords": ["Cycling"],
         "text": [
             "cycling",
-            "discard a card",
-            "discard this card",
             "whenever you cycle",
             "whenever you discard",
         ],
-        "keywords": ["Cycling"],
     },
     Theme.EQUIPMENT: {
-        "text": ["equip ", "equipped creature", "attach"],
+        "tags": [],
         "keywords": ["Equip"],
+        "text": ["equip ", "equipped creature", "attach"],
     },
     Theme.GRAVEYARD: {
+        "tags": ["recursion"],
+        "keywords": ["Escape", "Embalm", "Unearth", "Flashback"],
         "text": [
-            "return target creature card from your graveyard",
-            "return target card from your graveyard",
-            "from your graveyard to your hand",
-            "from your graveyard to the battlefield",
             "escape",
             "embalm",
             "unearth",
             "flashback",
         ],
-        "keywords": ["Escape", "Embalm", "Unearth", "Flashback"],
     },
     Theme.AGGRO: {
-        "text": ["haste", "can't block", "attacks each combat if able"],
+        "tags": [],
         "keywords": ["Haste"],
-    },
-    Theme.EVASION: {
-        "text": ["can't be blocked", "menace", "shadow"],
-        "keywords": ["Flying", "Menace", "Shadow"],
+        "text": ["can't block", "attacks each combat if able"],
     },
     Theme.RAMP: {
+        "tags": ["ramp", "mana-dork"],
+        "keywords": [],
         "text": [
             "search your library for a basic land",
             "add one mana",
             "mana of any color",
-            "put that card onto the battlefield",
         ],
-        "keywords": [],
+    },
+    Theme.EVASION: {
+        "tags": ["evasion"],
+        "keywords": ["Flying", "Menace", "Shadow"],
+        "text": ["can't be blocked"],
     },
 }
 
+# ETB exclusion patterns: lands entering tapped should not trigger ETB theme
+_ETB_EXCLUDE_PATTERN = "enters the battlefield tapped"
 
-def _card_matches_theme(card: Card, patterns: dict[str, list[str]]) -> bool:
-    """Check if a card matches any text pattern or keyword for a theme."""
-    text_lower = card.text.lower()
-    for pattern in patterns.get("text", []):
-        if pattern.lower() in text_lower:
+
+def _card_matches_theme(card: Card, theme: Theme, patterns: dict[str, list[str]]) -> bool:
+    """Check if a card matches any tag, keyword, or text pattern for a theme.
+
+    Uses a three-layer approach:
+    1. Primary: functional_tags from Scryfall oracle tagger
+    2. Secondary: keywords from Scryfall bulk data
+    3. Fallback: text pattern matching
+    """
+    # Layer 1: Scryfall oracle tags (most reliable)
+    for tag in patterns.get("tags", []):
+        if tag in card.functional_tags:
             return True
+
+    # Layer 2: Scryfall keywords
     for keyword in patterns.get("keywords", []):
         if keyword in card.keywords:
             return True
+
+    # Layer 3: Text pattern matching (fallback)
+    text_lower = card.text.lower()
+    for pattern in patterns.get("text", []):
+        if pattern.lower() in text_lower:
+            # Special handling for ETB: exclude lands entering tapped
+            if theme == Theme.ETB and _ETB_EXCLUDE_PATTERN in text_lower:
+                # Only exclude if the card is a land and the only ETB text
+                # is about entering tapped
+                if card.is_land:
+                    continue
+            return True
+
+    # Layer 1b: Check produced_mana for ramp detection
+    if theme == Theme.RAMP and card.produced_mana:
+        # Cards that produce mana and aren't lands are ramp-adjacent
+        if not card.is_land and "Land" not in card.types:
+            return True
+
     return False
 
 
 def detect_themes(cards: list[Card]) -> dict[Theme, list[Card]]:
     """Detect which cards belong to each theme.
+
+    Uses a hybrid approach: primary detection via Scryfall oracle tags,
+    secondary via keywords, fallback via text patterns.
 
     A card can belong to multiple themes if it matches patterns for each.
 
@@ -167,7 +209,7 @@ def detect_themes(cards: list[Card]) -> dict[Theme, list[Card]]:
     result: dict[Theme, list[Card]] = {theme: [] for theme in Theme}
     for card in cards:
         for theme, patterns in THEME_PATTERNS.items():
-            if _card_matches_theme(card, patterns):
+            if _card_matches_theme(card, theme, patterns):
                 result[theme].append(card)
     return result
 

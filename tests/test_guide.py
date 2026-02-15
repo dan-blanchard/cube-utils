@@ -18,6 +18,9 @@ def _make_card(
     text="",
     keywords=None,
     cmc=1,
+    functional_tags=None,
+    oracle_id="",
+    produced_mana=None,
 ):
     return Card(
         name=name,
@@ -27,30 +30,185 @@ def _make_card(
         types=types or ["Creature"],
         text=text,
         keywords=keywords or [],
+        oracle_id=oracle_id,
+        produced_mana=produced_mana or [],
+        functional_tags=functional_tags or [],
     )
 
 
-# --- Task 5: Theme Detection ---
+# --- Theme Detection ---
 
 
 class TestDetectThemes:
-    """Tests for detect_themes."""
+    """Tests for detect_themes with hybrid tag/keyword/text approach."""
 
-    def test_detect_sacrifice_theme(self):
+    # --- Tag-based detection (primary) ---
+
+    def test_detect_removal_via_tag(self):
+        card = _make_card(
+            name="Swords to Plowshares",
+            colors=["White"],
+            functional_tags=["removal"],
+        )
+        themes = detect_themes([card])
+        assert card in themes[Theme.REMOVAL]
+
+    def test_detect_sacrifice_via_tag(self):
         card = _make_card(
             name="Viscera Seer",
             colors=["Black"],
-            text="Sacrifice a creature: Scry 1.",
+            functional_tags=["sacrifice-outlet"],
         )
         themes = detect_themes([card])
         assert card in themes[Theme.SACRIFICE]
+
+    def test_detect_sacrifice_via_death_trigger(self):
+        """Death-trigger payoffs should also be in sacrifice theme."""
+        card = _make_card(
+            name="Blood Artist",
+            colors=["Black"],
+            text="Whenever a creature dies, target player loses 1 life and you gain 1 life.",
+        )
+        themes = detect_themes([card])
+        assert card in themes[Theme.SACRIFICE]
+
+    def test_sacrifice_not_triggered_by_cost(self):
+        """A card that only mentions 'sacrifice' as a cost (not as a theme) should not match
+        unless it has the sacrifice-outlet tag or death-trigger text."""
+        card = _make_card(
+            name="Random Fetch Land",
+            colors=[],
+            types=["Land"],
+            text="Sacrifice this land: Search your library for a basic land.",
+        )
+        themes = detect_themes([card])
+        assert card not in themes[Theme.SACRIFICE]
+
+    def test_detect_tokens_via_tag(self):
+        card = _make_card(
+            name="Raise the Alarm",
+            colors=["White"],
+            functional_tags=["token-maker"],
+        )
+        themes = detect_themes([card])
+        assert card in themes[Theme.TOKENS]
+
+    def test_detect_blink_via_tag(self):
+        card = _make_card(
+            name="Ephemerate",
+            colors=["White"],
+            functional_tags=["flicker"],
+        )
+        themes = detect_themes([card])
+        assert card in themes[Theme.BLINK]
+
+    def test_detect_evasion_via_tag(self):
+        card = _make_card(
+            name="Tormented Soul",
+            colors=["Black"],
+            functional_tags=["evasion"],
+        )
+        themes = detect_themes([card])
+        assert card in themes[Theme.EVASION]
+
+    def test_detect_ramp_via_tag(self):
+        card = _make_card(
+            name="Rampant Growth",
+            colors=["Green"],
+            functional_tags=["ramp"],
+        )
+        themes = detect_themes([card])
+        assert card in themes[Theme.RAMP]
+
+    def test_detect_graveyard_via_tag(self):
+        card = _make_card(
+            name="Reanimate",
+            colors=["Black"],
+            functional_tags=["recursion"],
+        )
+        themes = detect_themes([card])
+        assert card in themes[Theme.GRAVEYARD]
+
+    def test_detect_cycling_via_tag(self):
+        card = _make_card(
+            name="Oona's Grace",
+            colors=["Blue"],
+            functional_tags=["discard-outlet"],
+        )
+        themes = detect_themes([card])
+        assert card in themes[Theme.CYCLING]
+
+    # --- Keyword-based detection (secondary) ---
+
+    def test_detect_spells_matter_via_keyword(self):
+        card = _make_card(
+            name="Monastery Swiftspear",
+            colors=["Red"],
+            text="Haste",
+            keywords=["Prowess", "Haste"],
+        )
+        themes = detect_themes([card])
+        assert card in themes[Theme.SPELLS_MATTER]
+
+    def test_detect_graveyard_via_keyword(self):
+        card = _make_card(
+            name="Faithless Looting",
+            colors=["Red"],
+            text="Draw two cards, then discard two cards. Flashback {2}{R}",
+            keywords=["Flashback"],
+        )
+        themes = detect_themes([card])
+        assert card in themes[Theme.GRAVEYARD]
+
+    def test_detect_evasion_via_keyword(self):
+        card = _make_card(
+            name="Serra Angel",
+            colors=["White"],
+            text="Flying, vigilance",
+            keywords=["Flying", "Vigilance"],
+        )
+        themes = detect_themes([card])
+        assert card in themes[Theme.EVASION]
+
+    def test_detect_aggro_via_keyword(self):
+        card = _make_card(
+            name="Goblin Guide",
+            colors=["Red"],
+            text="Haste",
+            keywords=["Haste"],
+        )
+        themes = detect_themes([card])
+        assert card in themes[Theme.AGGRO]
+
+    def test_detect_equipment_via_keyword(self):
+        card = _make_card(
+            name="Bonesplitter",
+            colors=[],
+            types=["Artifact"],
+            text="Equipped creature gets +2/+0. Equip {1}",
+            keywords=["Equip"],
+        )
+        themes = detect_themes([card])
+        assert card in themes[Theme.EQUIPMENT]
+
+    def test_detect_cycling_via_keyword(self):
+        card = _make_card(
+            name="Cast Out",
+            colors=["White"],
+            text="Cycling {W}",
+            keywords=["Cycling"],
+        )
+        themes = detect_themes([card])
+        assert card in themes[Theme.CYCLING]
+
+    # --- Text-based detection (fallback) ---
 
     def test_detect_counters_theme(self):
         card = _make_card(
             name="Arcbound Ravager",
             colors=[],
             types=["Artifact", "Creature"],
-            text="Sacrifice an artifact: Put a +1/+1 counter on Arcbound Ravager. Modular 1",
+            text="Put a +1/+1 counter on Arcbound Ravager. Modular 1",
         )
         themes = detect_themes([card])
         assert card in themes[Theme.COUNTERS]
@@ -64,6 +222,17 @@ class TestDetectThemes:
         themes = detect_themes([card])
         assert card in themes[Theme.ETB]
 
+    def test_etb_excludes_land_entering_tapped(self):
+        """Lands that enter tapped should not trigger ETB theme."""
+        card = _make_card(
+            name="Boros Garrison",
+            colors=[],
+            types=["Land"],
+            text="Boros Garrison enters the battlefield tapped. When it enters, return a land.",
+        )
+        themes = detect_themes([card])
+        assert card not in themes[Theme.ETB]
+
     def test_detect_spells_matter_via_text(self):
         card = _make_card(
             name="Young Pyromancer",
@@ -73,15 +242,52 @@ class TestDetectThemes:
         themes = detect_themes([card])
         assert card in themes[Theme.SPELLS_MATTER]
 
-    def test_detect_spells_matter_via_keyword(self):
+    def test_detect_heroic_via_text(self):
         card = _make_card(
-            name="Monastery Swiftspear",
-            colors=["Red"],
-            text="Haste",
-            keywords=["Prowess", "Haste"],
+            name="Favored Hoplite",
+            colors=["White"],
+            text="Heroic -- Whenever you cast a spell that targets Favored Hoplite",
+            keywords=["Heroic"],
         )
         themes = detect_themes([card])
-        assert card in themes[Theme.SPELLS_MATTER]
+        assert card in themes[Theme.HEROIC]
+
+    def test_detect_artifacts_via_text(self):
+        card = _make_card(
+            name="Cranial Plating",
+            colors=[],
+            types=["Artifact"],
+            text="Equipped creature gets +1/+0 for each artifact you control.",
+        )
+        themes = detect_themes([card])
+        assert card in themes[Theme.ARTIFACTS]
+
+    # --- Ramp via produced_mana ---
+
+    def test_detect_ramp_via_produced_mana(self):
+        card = _make_card(
+            name="Llanowar Elves",
+            colors=["Green"],
+            types=["Creature"],
+            text="{T}: Add {G}.",
+            produced_mana=["G"],
+        )
+        themes = detect_themes([card])
+        assert card in themes[Theme.RAMP]
+
+    def test_ramp_produced_mana_excludes_lands(self):
+        """Lands that produce mana should not be detected as ramp."""
+        card = _make_card(
+            name="Forest",
+            colors=[],
+            types=["Land"],
+            text="{T}: Add {G}.",
+            produced_mana=["G"],
+        )
+        themes = detect_themes([card])
+        assert card not in themes[Theme.RAMP]
+
+    # --- Multi-theme detection ---
 
     def test_card_in_multiple_themes(self):
         """A card can belong to multiple themes."""
@@ -89,31 +295,12 @@ class TestDetectThemes:
             name="Arcbound Ravager",
             colors=[],
             types=["Artifact", "Creature"],
-            text="Sacrifice an artifact: Put a +1/+1 counter on Arcbound Ravager. Modular 1",
+            text="Put a +1/+1 counter on Arcbound Ravager. Modular 1",
+            functional_tags=["sacrifice-outlet"],
         )
         themes = detect_themes([card])
         assert card in themes[Theme.SACRIFICE]
         assert card in themes[Theme.COUNTERS]
-
-    def test_detect_tokens_theme(self):
-        card = _make_card(
-            name="Raise the Alarm",
-            colors=["White"],
-            text="Create two 1/1 white Soldier creature tokens.",
-        )
-        themes = detect_themes([card])
-        assert card in themes[Theme.TOKENS]
-
-    def test_detect_equipment_via_keyword(self):
-        card = _make_card(
-            name="Bonesplitter",
-            colors=[],
-            types=["Artifact"],
-            text="Equipped creature gets +2/+0. Equip {1}",
-            keywords=["Equip"],
-        )
-        themes = detect_themes([card])
-        assert card in themes[Theme.EQUIPMENT]
 
     def test_no_false_positive(self):
         card = _make_card(
@@ -126,7 +313,7 @@ class TestDetectThemes:
             assert card not in theme_cards
 
 
-# --- Task 6: Color Pair Analysis and Bridge Cards ---
+# --- Color Pair Analysis and Bridge Cards ---
 
 
 class TestAnalyzeColorPairs:
@@ -191,12 +378,13 @@ class TestFindBridgeCards:
     """Tests for find_bridge_cards."""
 
     def test_finds_bridge_card(self):
-        # This card matches both SACRIFICE and COUNTERS
+        # This card matches both SACRIFICE (via tag) and COUNTERS (via text)
         card = _make_card(
             name="Arcbound Ravager",
             colors=[],
             types=["Artifact", "Creature"],
-            text="Sacrifice an artifact: Put a +1/+1 counter on Arcbound Ravager. Modular 1",
+            text="Put a +1/+1 counter on Arcbound Ravager. Modular 1",
+            functional_tags=["sacrifice-outlet"],
         )
         themes = detect_themes([card])
         bridges = find_bridge_cards(themes)
@@ -206,7 +394,8 @@ class TestFindBridgeCards:
         card = _make_card(
             name="Viscera Seer",
             colors=["Black"],
-            text="Sacrifice a creature: Scry 1.",
+            text="Scry 1.",
+            functional_tags=["sacrifice-outlet"],
         )
         themes = detect_themes([card])
         bridges = find_bridge_cards(themes)
@@ -215,11 +404,11 @@ class TestFindBridgeCards:
     def test_bridges_sorted_by_name(self):
         card_a = _make_card(
             name="Zealous Ravager",
-            text="Sacrifice a creature. Put a +1/+1 counter on it.",
+            text="When this creature dies, put a +1/+1 counter on target creature.",
         )
         card_b = _make_card(
             name="Alpha Bridge",
-            text="Sacrifice a creature. Put a +1/+1 counter on it.",
+            text="When this creature dies, put a +1/+1 counter on target creature.",
         )
         themes = detect_themes([card_a, card_b])
         bridges = find_bridge_cards(themes)
@@ -227,7 +416,7 @@ class TestFindBridgeCards:
         assert names == sorted(names)
 
 
-# --- Task 7: Guide Markdown Output ---
+# --- Guide Markdown Output ---
 
 
 class TestGenerateGuideMarkdown:
@@ -235,10 +424,16 @@ class TestGenerateGuideMarkdown:
 
     def _build_guide_data(self):
         """Create a small set of cards and run the full pipeline."""
+        removal_card = _make_card(
+            name="Swords to Plowshares",
+            colors=["White"],
+            functional_tags=["removal"],
+        )
         sacrifice_card = _make_card(
             name="Viscera Seer",
             colors=["Black"],
-            text="Sacrifice a creature: Scry 1.",
+            text="Scry 1.",
+            functional_tags=["sacrifice-outlet"],
         )
         heroic_white = _make_card(
             name="Favored Hoplite",
@@ -262,9 +457,10 @@ class TestGenerateGuideMarkdown:
             name="Arcbound Ravager",
             colors=[],
             types=["Artifact", "Creature"],
-            text="Sacrifice an artifact: Put a +1/+1 counter on Arcbound Ravager.",
+            text="Put a +1/+1 counter on Arcbound Ravager.",
+            functional_tags=["sacrifice-outlet"],
         )
-        cards = [sacrifice_card, heroic_white, heroic_red, gold, bridge]
+        cards = [removal_card, sacrifice_card, heroic_white, heroic_red, gold, bridge]
         themes = detect_themes(cards)
         pairs = analyze_color_pairs(cards, themes)
         bridges = find_bridge_cards(themes)
