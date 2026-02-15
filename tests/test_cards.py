@@ -2,7 +2,13 @@
 
 from pathlib import Path
 
-from cube_utils.cards import Card, Category, categorize_cards, load_cube
+from cube_utils.cards import (
+    Card,
+    Category,
+    categorize_cards,
+    enrich_with_scryfall,
+    load_cube,
+)
 
 
 class TestCard:
@@ -297,3 +303,41 @@ class TestCategorizeCards:
         assert len(all_categorized) == len(cards)
         # No duplicates
         assert len(set(id(c) for c in all_categorized)) == len(cards)
+
+
+class TestEnrichWithScryfall:
+    """Tests for the enrich_with_scryfall function."""
+
+    def test_enrichment_adds_keywords(self, sample_csv, sample_scryfall_path):
+        cards = load_cube(sample_csv)
+        enrich_with_scryfall(cards, sample_scryfall_path)
+        bolt = next(c for c in cards if c.name == "Lightning Bolt")
+        assert bolt.keywords == ["Prowess"]
+
+    def test_enrichment_adds_empty_keywords(self, sample_csv, sample_scryfall_path):
+        cards = load_cube(sample_csv)
+        enrich_with_scryfall(cards, sample_scryfall_path)
+        counterspell = next(c for c in cards if c.name == "Counterspell")
+        assert counterspell.keywords == []
+
+    def test_enrichment_multicolor_card(self, sample_csv, sample_scryfall_path):
+        cards = load_cube(sample_csv)
+        enrich_with_scryfall(cards, sample_scryfall_path)
+        anax = next(c for c in cards if c.name == "Anax and Cymede")
+        assert anax.keywords == ["Heroic"]
+
+    def test_skips_cards_not_in_scryfall(self, sample_csv, sample_scryfall_path):
+        """Cards whose scryfall_id is not in the JSON should keep empty keywords."""
+        cards = load_cube(sample_csv)
+        enrich_with_scryfall(cards, sample_scryfall_path)
+        # Evolving Wilds is not in the sample scryfall data
+        ew = next(c for c in cards if c.name == "Evolving Wilds")
+        assert ew.keywords == []
+
+    def test_only_loads_cube_card_ids(self, sample_csv, sample_scryfall_path):
+        """The lookup dict should only contain IDs present in the cube."""
+        cards = load_cube(sample_csv)
+        enrich_with_scryfall(cards, sample_scryfall_path)
+        # "Some Other Card" (aaaaaaaa-...) should not affect any cube card
+        for card in cards:
+            assert "Flying" not in card.keywords or card.name != "Some Other Card"

@@ -2,6 +2,7 @@
 
 import csv
 import io
+import json
 import textwrap
 from pathlib import Path
 
@@ -33,3 +34,33 @@ def sample_csv(tmp_path: Path) -> Path:
 def real_cube_path() -> Path:
     """Path to the real cube CSV file."""
     return Path(__file__).parent.parent / "cube-2.csv"
+
+
+@pytest.fixture
+def sample_scryfall_path(tmp_path: Path) -> Path:
+    """Create a small Scryfall bulk JSON file for testing."""
+    data = [
+        {
+            "id": "e3285e6b-3e79-4d7c-bf96-d920f973b122",
+            "name": "Lightning Bolt",
+            "keywords": ["Prowess"],
+        },
+        {
+            "id": "1920dae4-fb92-4f19-ae4b-eb3276b8571c",
+            "name": "Counterspell",
+            "keywords": [],
+        },
+        {
+            "id": "71d9fd43-576f-45db-ab8f-a9f2a0427398",
+            "name": "Anax and Cymede",
+            "keywords": ["Heroic"],
+        },
+        {
+            "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            "name": "Some Other Card",
+            "keywords": ["Flying", "Trample"],
+        },
+    ]
+    scryfall_path = tmp_path / "scryfall.json"
+    scryfall_path.write_text(json.dumps(data))
+    return scryfall_path

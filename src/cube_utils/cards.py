@@ -1,6 +1,7 @@
 """Card data model and cube CSV loading."""
 
 import csv
+import json
 import re
 from dataclasses import dataclass, field
 from enum import Enum
@@ -89,7 +90,7 @@ def load_cube(path: Path) -> list[Card]:
         for row in reader:
             # CSV columns: quantity, card name, color, cmc, scryfall ID, types, card text
             # Card text may contain commas, so rejoin everything after column 6
-            quantity = row[0]
+            # row[0] is quantity (unused for now)
             name = row[1]
             color_str = row[2]
             cmc = int(row[3])
@@ -142,3 +143,31 @@ def categorize_cards(cards: list[Card]) -> dict[Category, list[Card]]:
                 result[cat].append(card)
 
     return result
+
+
+def enrich_with_scryfall(cards: list[Card], scryfall_path: Path) -> None:
+    """Enrich cards with keyword metadata from a Scryfall bulk JSON file.
+
+    Builds a lookup dict of only cube card IDs for efficient matching,
+    then populates the keywords field on each Card.
+
+    Args:
+        cards: List of Card objects to enrich (modified in place).
+        scryfall_path: Path to the Scryfall bulk JSON file.
+    """
+    cube_ids = {card.scryfall_id for card in cards}
+
+    # Build lookup of only the cards we care about
+    keywords_by_id: dict[str, list[str]] = {}
+    with open(scryfall_path, encoding="utf-8") as f:
+        scryfall_data = json.load(f)
+
+    for entry in scryfall_data:
+        entry_id = entry.get("id", "")
+        if entry_id in cube_ids:
+            keywords_by_id[entry_id] = entry.get("keywords", [])
+
+    # Populate keywords on each card
+    for card in cards:
+        if card.scryfall_id in keywords_by_id:
+            card.keywords = keywords_by_id[card.scryfall_id]
