@@ -1,0 +1,2 @@
+[console_scripts]
+cube-utils = cube_utils.cli:main
