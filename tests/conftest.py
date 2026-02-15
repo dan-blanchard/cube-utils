@@ -42,21 +42,32 @@ def sample_scryfall_path(tmp_path: Path) -> Path:
     data = [
         {
             "id": "e3285e6b-3e79-4d7c-bf96-d920f973b122",
+            "oracle_id": "orc-bolt",
             "name": "Lightning Bolt",
             "keywords": ["Prowess"],
         },
         {
             "id": "1920dae4-fb92-4f19-ae4b-eb3276b8571c",
+            "oracle_id": "orc-counter",
             "name": "Counterspell",
             "keywords": [],
         },
         {
             "id": "71d9fd43-576f-45db-ab8f-a9f2a0427398",
+            "oracle_id": "orc-anax",
             "name": "Anax and Cymede",
             "keywords": ["Heroic"],
         },
         {
+            "id": "fd71f597-ad12-4d2b-93af-3f8dfe4027b2",
+            "oracle_id": "orc-sphere",
+            "name": "Chromatic Sphere",
+            "keywords": [],
+            "produced_mana": ["W", "U", "B", "R", "G"],
+        },
+        {
             "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            "oracle_id": "orc-other",
             "name": "Some Other Card",
             "keywords": ["Flying", "Trample"],
         },
@@ -64,3 +75,20 @@ def sample_scryfall_path(tmp_path: Path) -> Path:
     scryfall_path = tmp_path / "scryfall.json"
     scryfall_path.write_text(json.dumps(data))
     return scryfall_path
+
+
+@pytest.fixture
+def sample_tags_cache(tmp_path: Path) -> Path:
+    """Create a sample Scryfall oracle tags cache file for testing."""
+    cache = {
+        "fetched_at": "2026-02-14T00:00:00+00:00",
+        "tags": {
+            "burn": ["orc-bolt"],
+            "removal": ["orc-bolt", "orc-counter"],
+            "counterspell": ["orc-counter"],
+            "ramp": ["orc-sphere"],
+        },
+    }
+    cache_path = tmp_path / "tags-cache.json"
+    cache_path.write_text(json.dumps(cache))
+    return cache_path

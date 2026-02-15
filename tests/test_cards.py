@@ -7,6 +7,7 @@ from cube_utils.cards import (
     Category,
     categorize_cards,
     enrich_with_scryfall,
+    enrich_with_tags,
     load_cube,
 )
 
@@ -341,3 +342,61 @@ class TestEnrichWithScryfall:
         # "Some Other Card" (aaaaaaaa-...) should not affect any cube card
         for card in cards:
             assert "Flying" not in card.keywords or card.name != "Some Other Card"
+
+    def test_enrichment_adds_oracle_id(self, sample_csv, sample_scryfall_path):
+        cards = load_cube(sample_csv)
+        enrich_with_scryfall(cards, sample_scryfall_path)
+        bolt = next(c for c in cards if c.name == "Lightning Bolt")
+        assert bolt.oracle_id == "orc-bolt"
+
+    def test_enrichment_adds_produced_mana(self, sample_csv, sample_scryfall_path):
+        cards = load_cube(sample_csv)
+        enrich_with_scryfall(cards, sample_scryfall_path)
+        sphere = next(c for c in cards if c.name == "Chromatic Sphere")
+        assert sphere.produced_mana == ["W", "U", "B", "R", "G"]
+
+    def test_enrichment_empty_produced_mana(self, sample_csv, sample_scryfall_path):
+        cards = load_cube(sample_csv)
+        enrich_with_scryfall(cards, sample_scryfall_path)
+        bolt = next(c for c in cards if c.name == "Lightning Bolt")
+        assert bolt.produced_mana == []
+
+    def test_unenriched_card_has_empty_oracle_id(self, sample_csv, sample_scryfall_path):
+        cards = load_cube(sample_csv)
+        enrich_with_scryfall(cards, sample_scryfall_path)
+        ew = next(c for c in cards if c.name == "Evolving Wilds")
+        assert ew.oracle_id == ""
+
+
+class TestEnrichWithTags:
+    """Tests for the enrich_with_tags function."""
+
+    def test_adds_functional_tags(self, sample_csv, sample_scryfall_path, sample_tags_cache):
+        cards = load_cube(sample_csv)
+        enrich_with_scryfall(cards, sample_scryfall_path)
+        enrich_with_tags(cards, sample_tags_cache)
+        bolt = next(c for c in cards if c.name == "Lightning Bolt")
+        assert "burn" in bolt.functional_tags
+        assert "removal" in bolt.functional_tags
+
+    def test_card_with_no_oracle_id_gets_no_tags(self, sample_csv, sample_scryfall_path, sample_tags_cache):
+        cards = load_cube(sample_csv)
+        enrich_with_scryfall(cards, sample_scryfall_path)
+        enrich_with_tags(cards, sample_tags_cache)
+        ew = next(c for c in cards if c.name == "Evolving Wilds")
+        assert ew.functional_tags == []
+
+    def test_card_not_in_any_tag(self, sample_csv, sample_scryfall_path, sample_tags_cache):
+        cards = load_cube(sample_csv)
+        enrich_with_scryfall(cards, sample_scryfall_path)
+        enrich_with_tags(cards, sample_tags_cache)
+        anax = next(c for c in cards if c.name == "Anax and Cymede")
+        assert anax.functional_tags == []
+
+    def test_multiple_tags_on_one_card(self, sample_csv, sample_scryfall_path, sample_tags_cache):
+        cards = load_cube(sample_csv)
+        enrich_with_scryfall(cards, sample_scryfall_path)
+        enrich_with_tags(cards, sample_tags_cache)
+        counterspell = next(c for c in cards if c.name == "Counterspell")
+        assert "removal" in counterspell.functional_tags
+        assert "counterspell" in counterspell.functional_tags

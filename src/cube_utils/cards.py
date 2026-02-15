@@ -47,6 +47,9 @@ class Card:
     types: list[str]
     text: str
     keywords: list[str] = field(default_factory=list)
+    oracle_id: str = ""
+    produced_mana: list[str] = field(default_factory=list)
+    functional_tags: list[str] = field(default_factory=list)
 
     @property
     def is_multicolor(self) -> bool:
@@ -146,10 +149,10 @@ def categorize_cards(cards: list[Card]) -> dict[Category, list[Card]]:
 
 
 def enrich_with_scryfall(cards: list[Card], scryfall_path: Path) -> None:
-    """Enrich cards with keyword metadata from a Scryfall bulk JSON file.
+    """Enrich cards with metadata from a Scryfall bulk JSON file.
 
     Builds a lookup dict of only cube card IDs for efficient matching,
-    then populates the keywords field on each Card.
+    then populates keywords, oracle_id, and produced_mana on each Card.
 
     Args:
         cards: List of Card objects to enrich (modified in place).
@@ -158,16 +161,45 @@ def enrich_with_scryfall(cards: list[Card], scryfall_path: Path) -> None:
     cube_ids = {card.scryfall_id for card in cards}
 
     # Build lookup of only the cards we care about
-    keywords_by_id: dict[str, list[str]] = {}
+    data_by_id: dict[str, dict] = {}
     with open(scryfall_path, encoding="utf-8") as f:
         scryfall_data = json.load(f)
 
     for entry in scryfall_data:
         entry_id = entry.get("id", "")
         if entry_id in cube_ids:
-            keywords_by_id[entry_id] = entry.get("keywords", [])
+            data_by_id[entry_id] = entry
 
-    # Populate keywords on each card
+    # Populate fields on each card
     for card in cards:
-        if card.scryfall_id in keywords_by_id:
-            card.keywords = keywords_by_id[card.scryfall_id]
+        entry = data_by_id.get(card.scryfall_id)
+        if entry:
+            card.keywords = entry.get("keywords", [])
+            card.oracle_id = entry.get("oracle_id", "")
+            card.produced_mana = entry.get("produced_mana", [])
+
+
+def enrich_with_tags(cards: list[Card], cache_path: Path) -> None:
+    """Enrich cards with functional tags from a Scryfall oracle tags cache.
+
+    Loads the tag cache and matches cards by oracle_id, populating the
+    functional_tags field on each Card.
+
+    Args:
+        cards: List of Card objects to enrich (modified in place).
+        cache_path: Path to the tags cache JSON file.
+    """
+    from cube_utils.tags import load_tags
+
+    tags_data = load_tags(cache_path)
+
+    # Build reverse lookup: oracle_id -> list of tag names
+    oracle_id_to_tags: dict[str, list[str]] = {}
+    for tag_name, oracle_ids in tags_data.items():
+        for oid in oracle_ids:
+            oracle_id_to_tags.setdefault(oid, []).append(tag_name)
+
+    # Populate functional_tags on each card
+    for card in cards:
+        if card.oracle_id:
+            card.functional_tags = oracle_id_to_tags.get(card.oracle_id, [])
