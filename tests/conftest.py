@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from cube_utils.cards import Card
+
 
 @pytest.fixture
 def sample_csv(tmp_path: Path) -> Path:
@@ -92,3 +94,83 @@ def sample_tags_cache(tmp_path: Path) -> Path:
     cache_path = tmp_path / "tags-cache.json"
     cache_path.write_text(json.dumps(cache))
     return cache_path
+
+
+def _make_card(name, colors, types, text=""):
+    """Helper to create a Card with all required fields."""
+    return Card(
+        name=name,
+        colors=colors,
+        cmc=2,
+        scryfall_id=f"id-{name.lower().replace(' ', '-')}",
+        types=types,
+        text=text,
+        keywords=[],
+        oracle_id="",
+        produced_mana=[],
+        functional_tags=[],
+    )
+
+
+@pytest.fixture
+def sample_cards() -> list[Card]:
+    """Create a sample set of cards for pack generation testing.
+
+    10 cards per mono color, 10 multicolor, 10 lands, 5 fixing artifacts,
+    5 colorless artifacts = 80 cards total.
+    """
+    cards: list[Card] = []
+
+    # 10 white creatures
+    for i in range(1, 11):
+        cards.append(_make_card(f"White Knight {i}", ["White"], ["Creature"]))
+
+    # 10 blue creatures
+    for i in range(1, 11):
+        cards.append(_make_card(f"Blue Wizard {i}", ["Blue"], ["Creature"]))
+
+    # 10 black creatures
+    for i in range(1, 11):
+        cards.append(_make_card(f"Black Shade {i}", ["Black"], ["Creature"]))
+
+    # 10 red creatures
+    for i in range(1, 11):
+        cards.append(_make_card(f"Red Goblin {i}", ["Red"], ["Creature"]))
+
+    # 10 green creatures
+    for i in range(1, 11):
+        cards.append(_make_card(f"Green Elf {i}", ["Green"], ["Creature"]))
+
+    # 10 multicolor creatures
+    for i in range(1, 11):
+        cards.append(
+            _make_card(f"Gold Card {i}", ["White", "Blue"], ["Creature"])
+        )
+
+    # 10 lands
+    for i in range(1, 11):
+        cards.append(_make_card(f"Dual Land {i}", [], ["Land"]))
+
+    # 5 fixing artifacts
+    for i in range(1, 6):
+        cards.append(
+            _make_card(
+                f"Mana Rock {i}",
+                [],
+                ["Artifact"],
+                text="Add one mana of any color.",
+            )
+        )
+
+    # 5 colorless artifacts (non-fixing)
+    for i in range(1, 6):
+        cards.append(
+            _make_card(
+                f"Equipment {i}",
+                [],
+                ["Artifact"],
+                text="Equipped creature gets +1/+1.",
+            )
+        )
+
+    return cards
