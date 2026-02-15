@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from collections import Counter
+from dataclasses import dataclass, field
 from enum import Enum
+from itertools import combinations
 
 from cube_utils.cards import Card
 
@@ -167,3 +170,116 @@ def detect_themes(cards: list[Card]) -> dict[Theme, list[Card]]:
             if _card_matches_theme(card, patterns):
                 result[theme].append(card)
     return result
+
+
+# --- Color Pair Analysis ---
+
+_COLOR_ABBREV = {
+    "White": "W",
+    "Blue": "U",
+    "Black": "B",
+    "Red": "R",
+    "Green": "G",
+}
+
+_GUILD_NAMES = {
+    ("Black", "Blue"): "Dimir",
+    ("Black", "Green"): "Golgari",
+    ("Black", "Red"): "Rakdos",
+    ("Black", "White"): "Orzhov",
+    ("Blue", "Green"): "Simic",
+    ("Blue", "Red"): "Izzet",
+    ("Blue", "White"): "Azorius",
+    ("Green", "Red"): "Gruul",
+    ("Green", "White"): "Selesnya",
+    ("Red", "White"): "Boros",
+}
+
+_ALL_COLORS = ["Black", "Blue", "Green", "Red", "White"]
+COLOR_PAIRS: list[tuple[str, str]] = [
+    (a, b) for a, b in combinations(_ALL_COLORS, 2)
+]
+
+
+@dataclass
+class ColorPairAnalysis:
+    """Analysis of a two-color pair in the cube."""
+
+    colors: tuple[str, str]
+    multicolor_cards: list[Card]
+    shared_themes: list[Theme]
+    theme_cards: dict[Theme, list[Card]] = field(default_factory=dict)
+
+
+def analyze_color_pairs(
+    cards: list[Card], themes: dict[Theme, list[Card]]
+) -> list[ColorPairAnalysis]:
+    """Analyze each two-color pair for multicolor cards and shared themes.
+
+    Args:
+        cards: List of all cube cards.
+        themes: Dict of detected themes from detect_themes().
+
+    Returns:
+        List of ColorPairAnalysis, one per color pair.
+    """
+    results: list[ColorPairAnalysis] = []
+
+    for pair in COLOR_PAIRS:
+        pair_set = set(pair)
+
+        # Find multicolor cards whose colors exactly match this pair
+        multicolor = [
+            c for c in cards if c.is_multicolor and set(c.colors) == pair_set
+        ]
+
+        # Find themes where both colors contribute cards
+        shared: list[Theme] = []
+        theme_card_map: dict[Theme, list[Card]] = {}
+        for theme, theme_cards in themes.items():
+            colors_present = set()
+            cards_in_pair: list[Card] = []
+            for tc in theme_cards:
+                card_colors = set(tc.colors)
+                if card_colors & pair_set:
+                    colors_present |= card_colors & pair_set
+                    cards_in_pair.append(tc)
+            if pair_set <= colors_present:
+                shared.append(theme)
+                theme_card_map[theme] = cards_in_pair
+
+        results.append(
+            ColorPairAnalysis(
+                colors=pair,
+                multicolor_cards=multicolor,
+                shared_themes=shared,
+                theme_cards=theme_card_map,
+            )
+        )
+
+    return results
+
+
+def find_bridge_cards(themes: dict[Theme, list[Card]]) -> list[Card]:
+    """Find cards that appear in two or more themes.
+
+    Args:
+        themes: Dict of detected themes from detect_themes().
+
+    Returns:
+        List of unique cards appearing in 2+ themes, sorted by name.
+    """
+    card_theme_count: Counter[str] = Counter()
+    card_by_name: dict[str, Card] = {}
+
+    for theme_cards in themes.values():
+        for card in theme_cards:
+            card_theme_count[card.name] += 1
+            card_by_name[card.name] = card
+
+    bridges = [
+        card_by_name[name]
+        for name, count in card_theme_count.items()
+        if count >= 2
+    ]
+    return sorted(bridges, key=lambda c: c.name)

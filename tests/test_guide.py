@@ -2,8 +2,11 @@
 
 from cube_utils.cards import Card
 from cube_utils.guide import (
+    ColorPairAnalysis,
     Theme,
+    analyze_color_pairs,
     detect_themes,
+    find_bridge_cards,
 )
 
 
@@ -120,3 +123,104 @@ class TestDetectThemes:
         themes = detect_themes([card])
         for theme_cards in themes.values():
             assert card not in theme_cards
+
+
+# --- Task 6: Color Pair Analysis and Bridge Cards ---
+
+
+class TestAnalyzeColorPairs:
+    """Tests for analyze_color_pairs."""
+
+    def test_finds_multicolor_cards_for_pair(self):
+        gold = _make_card(
+            name="Anax and Cymede",
+            colors=["White", "Red"],
+            text="Heroic",
+            keywords=["Heroic"],
+        )
+        mono = _make_card(name="Lightning Bolt", colors=["Red"], text="3 damage")
+        themes = detect_themes([gold, mono])
+        pairs = analyze_color_pairs([gold, mono], themes)
+
+        # Find the Red/White (Boros) pair
+        boros = next(p for p in pairs if set(p.colors) == {"Red", "White"})
+        assert gold in boros.multicolor_cards
+        assert mono not in boros.multicolor_cards
+
+    def test_finds_shared_themes(self):
+        white_heroic = _make_card(
+            name="Favored Hoplite",
+            colors=["White"],
+            text="Heroic -- Whenever you cast a spell that targets Favored Hoplite",
+            keywords=["Heroic"],
+        )
+        red_heroic = _make_card(
+            name="Satyr Hoplite",
+            colors=["Red"],
+            text="Heroic -- Whenever you cast a spell that targets Satyr Hoplite",
+            keywords=["Heroic"],
+        )
+        themes = detect_themes([white_heroic, red_heroic])
+        pairs = analyze_color_pairs([white_heroic, red_heroic], themes)
+
+        boros = next(p for p in pairs if set(p.colors) == {"Red", "White"})
+        assert Theme.HEROIC in boros.shared_themes
+
+    def test_no_shared_theme_if_only_one_color(self):
+        red_aggro = _make_card(
+            name="Goblin Guide",
+            colors=["Red"],
+            text="Haste",
+            keywords=["Haste"],
+        )
+        themes = detect_themes([red_aggro])
+        pairs = analyze_color_pairs([red_aggro], themes)
+
+        # Boros should NOT have Aggro as shared since only Red contributes
+        boros = next(p for p in pairs if set(p.colors) == {"Red", "White"})
+        assert Theme.AGGRO not in boros.shared_themes
+
+    def test_returns_ten_pairs(self):
+        themes = detect_themes([])
+        pairs = analyze_color_pairs([], themes)
+        assert len(pairs) == 10
+
+
+class TestFindBridgeCards:
+    """Tests for find_bridge_cards."""
+
+    def test_finds_bridge_card(self):
+        # This card matches both SACRIFICE and COUNTERS
+        card = _make_card(
+            name="Arcbound Ravager",
+            colors=[],
+            types=["Artifact", "Creature"],
+            text="Sacrifice an artifact: Put a +1/+1 counter on Arcbound Ravager. Modular 1",
+        )
+        themes = detect_themes([card])
+        bridges = find_bridge_cards(themes)
+        assert card.name in [c.name for c in bridges]
+
+    def test_single_theme_card_not_bridge(self):
+        card = _make_card(
+            name="Viscera Seer",
+            colors=["Black"],
+            text="Sacrifice a creature: Scry 1.",
+        )
+        themes = detect_themes([card])
+        bridges = find_bridge_cards(themes)
+        assert card.name not in [c.name for c in bridges]
+
+    def test_bridges_sorted_by_name(self):
+        card_a = _make_card(
+            name="Zealous Ravager",
+            text="Sacrifice a creature. Put a +1/+1 counter on it.",
+        )
+        card_b = _make_card(
+            name="Alpha Bridge",
+            text="Sacrifice a creature. Put a +1/+1 counter on it.",
+        )
+        themes = detect_themes([card_a, card_b])
+        bridges = find_bridge_cards(themes)
+        names = [c.name for c in bridges]
+        assert names == sorted(names)
