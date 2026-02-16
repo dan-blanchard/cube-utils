@@ -1,7 +1,5 @@
 """Shared test fixtures for cube_utils tests."""
 
-import csv
-import io
 import json
 import textwrap
 from pathlib import Path
@@ -143,9 +141,7 @@ def sample_cards() -> list[Card]:
 
     # 10 multicolor creatures
     for i in range(1, 11):
-        cards.append(
-            _make_card(f"Gold Card {i}", ["White", "Blue"], ["Creature"])
-        )
+        cards.append(_make_card(f"Gold Card {i}", ["White", "Blue"], ["Creature"]))
 
     # 10 lands
     for i in range(1, 11):

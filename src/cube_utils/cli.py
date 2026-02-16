@@ -1,6 +1,6 @@
-import click
-
 from pathlib import Path
+
+import click
 
 from cube_utils.cards import (
     Category,
@@ -22,7 +22,6 @@ from cube_utils.packs import (
     get_pack_structure,
 )
 from cube_utils.tags import fetch_tags
-
 
 _COLOR_SHORT = {
     "white": "W",
@@ -46,7 +45,7 @@ _CATEGORY_LABEL = {
 
 
 def _format_template(template) -> str:
-    """Format a PackTemplate as a compact string like '2W 1U 1B 2R 1G 1colorless 3multi 2land 1fixing'."""
+    """Format a PackTemplate as a compact string."""
     parts = []
     for attr, short in _COLOR_SHORT.items():
         count = getattr(template, attr)
@@ -164,14 +163,16 @@ def packs(
     categorized = categorize_cards(cards)
 
     if grid_mode:
-        _handle_grid_draft(players, num_grids, categorized)
+        _handle_grid_draft(
+            players=players, num_grids=num_grids, categorized=categorized
+        )
         return
 
     # Validate pack size
     try:
         get_pack_structure(pack_size)
     except ValueError as e:
-        raise click.ClickException(str(e))
+        raise click.ClickException(str(e)) from None
 
     total_packs = players * num_packs
     total_cards_needed = total_packs * pack_size
@@ -184,10 +185,13 @@ def packs(
     if cards_mode:
         try:
             all_packs = generate_card_packs(
-                categorized, total_packs, pack_size, unseeded
+                categorized=categorized,
+                num_packs=total_packs,
+                pack_size=pack_size,
+                unseeded=unseeded,
             )
         except ValueError as e:
-            raise click.ClickException(str(e))
+            raise click.ClickException(str(e)) from None
 
         output_parts = []
         for player_idx in range(players):
@@ -200,7 +204,7 @@ def packs(
 
         output_text = "\n\n".join(output_parts) + "\n"
     else:
-        templates = generate_pack_templates(total_packs, pack_size)
+        templates = generate_pack_templates(num_packs=total_packs, pack_size=pack_size)
 
         output_parts = []
         for player_idx in range(players):
@@ -226,7 +230,7 @@ def packs(
         click.echo(output_text, nl=False)
 
 
-def _handle_grid_draft(players, num_grids, categorized):
+def _handle_grid_draft(*, players, num_grids, categorized):
     """Handle --grid mode: print category counts for grid draft pools."""
 
     try:
@@ -234,7 +238,7 @@ def _handle_grid_draft(players, num_grids, categorized):
             players=players, num_grids=num_grids, categorized=categorized
         )
     except ValueError as e:
-        raise click.ClickException(str(e))
+        raise click.ClickException(str(e)) from None
 
     num_pools = len(pool_templates)
     cards_per_pool = pool_templates[0].total()
@@ -264,7 +268,7 @@ def _handle_grid_draft(players, num_grids, categorized):
 )
 def fetch_tags_cmd(output_path):
     """Fetch Scryfall oracle tags and cache locally."""
-    click.echo(f"Fetching oracle tags from Scryfall...")
+    click.echo("Fetching oracle tags from Scryfall...")
     cache = fetch_tags(cache_path=Path(output_path))
     tag_counts = {tag: len(ids) for tag, ids in cache["tags"].items()}
     total = sum(tag_counts.values())
@@ -314,7 +318,7 @@ def guide(cube_path, scryfall_path, tags_cache_path, output_path):
     themes = detect_themes(cards)
     pairs = analyze_color_pairs(cards, themes)
     bridges = find_bridge_cards(themes)
-    markdown = generate_guide_markdown(themes, pairs, bridges)
+    markdown = generate_guide_markdown(themes=themes, pairs=pairs, bridges=bridges)
 
     if output_path:
         Path(output_path).write_text(markdown, encoding="utf-8")

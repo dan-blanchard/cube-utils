@@ -2,7 +2,7 @@
 
 import json
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
@@ -94,7 +94,7 @@ def fetch_tags(
         result_tags[tag] = oracle_ids
 
     cache = {
-        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "fetched_at": datetime.now(UTC).isoformat(),
         "tags": result_tags,
     }
 
@@ -119,7 +119,7 @@ def load_tags(cache_path: Path | None = None) -> dict[str, list[str]]:
     if cache_path is None:
         cache_path = DEFAULT_CACHE_PATH
 
-    with open(cache_path, encoding="utf-8") as f:
+    with cache_path.open(encoding="utf-8") as f:
         cache = json.load(f)
 
     return cache.get("tags", {})

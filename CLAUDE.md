@@ -8,6 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 uv sync                          # Install dependencies
 uv run pytest                    # Run all tests
 uv run pytest tests/test_packs.py::TestGenerateCardPacks::test_9_card_packs  # Run a single test
+uv run ruff check src/ tests/    # Lint
+uv run ruff format src/ tests/   # Format
 uv run cube-utils packs --cube regular-cube.csv --players 8   # Run CLI
 ```
 

@@ -2,7 +2,6 @@
 
 from cube_utils.cards import Card
 from cube_utils.guide import (
-    ColorPairAnalysis,
     Theme,
     analyze_color_pairs,
     detect_themes,
@@ -468,27 +467,27 @@ class TestGenerateGuideMarkdown:
 
     def test_has_main_heading(self):
         themes, pairs, bridges, _ = self._build_guide_data()
-        md = generate_guide_markdown(themes, pairs, bridges)
+        md = generate_guide_markdown(themes=themes, pairs=pairs, bridges=bridges)
         assert "# Draft Guide Skeleton" in md
 
     def test_has_themes_section(self):
         themes, pairs, bridges, _ = self._build_guide_data()
-        md = generate_guide_markdown(themes, pairs, bridges)
+        md = generate_guide_markdown(themes=themes, pairs=pairs, bridges=bridges)
         assert "## Themes" in md
 
     def test_has_color_pairs_section(self):
         themes, pairs, bridges, _ = self._build_guide_data()
-        md = generate_guide_markdown(themes, pairs, bridges)
+        md = generate_guide_markdown(themes=themes, pairs=pairs, bridges=bridges)
         assert "## Color Pairs" in md
 
     def test_has_bridge_cards_section(self):
         themes, pairs, bridges, _ = self._build_guide_data()
-        md = generate_guide_markdown(themes, pairs, bridges)
+        md = generate_guide_markdown(themes=themes, pairs=pairs, bridges=bridges)
         assert "## Bridge Cards" in md
 
     def test_lists_card_names(self):
         themes, pairs, bridges, _ = self._build_guide_data()
-        md = generate_guide_markdown(themes, pairs, bridges)
+        md = generate_guide_markdown(themes=themes, pairs=pairs, bridges=bridges)
         assert "Viscera Seer" in md
         assert "Favored Hoplite" in md
         assert "Anax and Cymede" in md
@@ -496,11 +495,11 @@ class TestGenerateGuideMarkdown:
 
     def test_bridge_card_lists_themes(self):
         themes, pairs, bridges, _ = self._build_guide_data()
-        md = generate_guide_markdown(themes, pairs, bridges)
+        md = generate_guide_markdown(themes=themes, pairs=pairs, bridges=bridges)
         # Arcbound Ravager should be listed as a bridge with its themes
         assert "**Arcbound Ravager**" in md
 
     def test_guild_name_appears(self):
         themes, pairs, bridges, _ = self._build_guide_data()
-        md = generate_guide_markdown(themes, pairs, bridges)
+        md = generate_guide_markdown(themes=themes, pairs=pairs, bridges=bridges)
         assert "Boros" in md

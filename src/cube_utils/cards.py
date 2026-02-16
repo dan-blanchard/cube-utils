@@ -87,13 +87,12 @@ def load_cube(path: Path) -> list[Card]:
         List of draftable Card objects.
     """
     cards: list[Card] = []
-    with open(path, newline="", encoding="utf-8") as f:
+    with path.open(newline="", encoding="utf-8") as f:
         reader = csv.reader(f)
         next(reader)  # skip header
         for row in reader:
-            # CSV columns: quantity, card name, color, cmc, scryfall ID, types, card text
-            # Card text may contain commas, so rejoin everything after column 6
-            # row[0] is quantity (unused for now)
+            # CSV: quantity, name, color, cmc, scryfall ID, types, text
+            # Text may contain commas, so rejoin everything past col 6
             name = row[1]
             color_str = row[2]
             cmc = int(row[3])
@@ -162,7 +161,7 @@ def enrich_with_scryfall(cards: list[Card], scryfall_path: Path) -> None:
 
     # Build lookup of only the cards we care about
     data_by_id: dict[str, dict] = {}
-    with open(scryfall_path, encoding="utf-8") as f:
+    with scryfall_path.open(encoding="utf-8") as f:
         scryfall_data = json.load(f)
 
     for entry in scryfall_data:

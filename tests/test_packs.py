@@ -1,23 +1,20 @@
 """Tests for pack generation."""
 
 import csv
-import random
 from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
 
-from cube_utils.cards import Card, Category, categorize_cards
+from cube_utils.cards import Card, categorize_cards
 from cube_utils.cli import main
 from cube_utils.packs import (
-    PackStructure,
     PackTemplate,
     generate_card_packs,
     generate_grid_templates,
     generate_pack_templates,
     get_pack_structure,
 )
-
 
 # ---------------------------------------------------------------------------
 # Task 10: PackStructure tests
@@ -90,21 +87,42 @@ class TestPackTemplate:
 
     def test_template_total(self):
         t = PackTemplate(
-            white=2, blue=1, black=1, red=1, green=1,
-            colorless=1, multicolor=3, land=2, fixing=1,
+            white=2,
+            blue=1,
+            black=1,
+            red=1,
+            green=1,
+            colorless=1,
+            multicolor=3,
+            land=2,
+            fixing=1,
         )
         assert t.total() == 13  # 2+1+1+1+1+1+3+2+1
 
     def test_template_total_15(self):
         t = PackTemplate(
-            white=2, blue=1, black=1, red=2, green=1,
-            colorless=1, multicolor=2, land=3, fixing=1,
+            white=2,
+            blue=1,
+            black=1,
+            red=2,
+            green=1,
+            colorless=1,
+            multicolor=2,
+            land=3,
+            fixing=1,
         )
         assert t.total() == 14  # wrong if we don't have correct values
         # Let's test a real 15-card template
         t2 = PackTemplate(
-            white=2, blue=1, black=1, red=2, green=1,
-            colorless=1, multicolor=3, land=2, fixing=2,
+            white=2,
+            blue=1,
+            black=1,
+            red=2,
+            green=1,
+            colorless=1,
+            multicolor=3,
+            land=2,
+            fixing=2,
         )
         assert t2.total() == 15
 
@@ -113,26 +131,26 @@ class TestGeneratePackTemplates:
     """Tests for generate_pack_templates."""
 
     def test_returns_correct_count(self):
-        templates = generate_pack_templates(6, 15)
+        templates = generate_pack_templates(num_packs=6, pack_size=15)
         assert len(templates) == 6
 
     def test_each_template_has_correct_total(self):
-        templates = generate_pack_templates(10, 15)
+        templates = generate_pack_templates(num_packs=10, pack_size=15)
         for t in templates:
             assert t.total() == 15
 
     def test_each_template_has_correct_total_11(self):
-        templates = generate_pack_templates(10, 11)
+        templates = generate_pack_templates(num_packs=10, pack_size=11)
         for t in templates:
             assert t.total() == 11
 
     def test_each_template_has_correct_total_9(self):
-        templates = generate_pack_templates(10, 9)
+        templates = generate_pack_templates(num_packs=10, pack_size=9)
         for t in templates:
             assert t.total() == 9
 
     def test_each_color_at_least_1(self):
-        templates = generate_pack_templates(20, 15)
+        templates = generate_pack_templates(num_packs=20, pack_size=15)
         for t in templates:
             assert t.white >= 1
             assert t.blue >= 1
@@ -141,37 +159,37 @@ class TestGeneratePackTemplates:
             assert t.green >= 1
 
     def test_colorless_matches_structure(self):
-        templates = generate_pack_templates(10, 15)
+        templates = generate_pack_templates(num_packs=10, pack_size=15)
         for t in templates:
             assert t.colorless == 1
 
     def test_fixing_matches_structure(self):
-        templates = generate_pack_templates(10, 15)
+        templates = generate_pack_templates(num_packs=10, pack_size=15)
         for t in templates:
             assert t.fixing == 1
 
     def test_multicolor_within_range(self):
         ps = get_pack_structure(15)
-        templates = generate_pack_templates(50, 15)
+        templates = generate_pack_templates(num_packs=50, pack_size=15)
         for t in templates:
             assert ps.multicolor_range[0] <= t.multicolor <= ps.multicolor_range[1]
 
     def test_land_within_range(self):
         ps = get_pack_structure(15)
-        templates = generate_pack_templates(50, 15)
+        templates = generate_pack_templates(num_packs=50, pack_size=15)
         for t in templates:
             assert ps.land_range[0] <= t.land <= ps.land_range[1]
 
     def test_extra_mono_distributed(self):
         """For 15-card packs, extra_mono=3 means sum of colors is 5+3=8."""
-        templates = generate_pack_templates(10, 15)
+        templates = generate_pack_templates(num_packs=10, pack_size=15)
         for t in templates:
             color_total = t.white + t.blue + t.black + t.red + t.green
             assert color_total == 8  # 5 base + 3 extra
 
     def test_extra_mono_for_11(self):
         """For 11-card packs, extra_mono=1 so sum of colors is 5+1=6."""
-        templates = generate_pack_templates(10, 11)
+        templates = generate_pack_templates(num_packs=10, pack_size=11)
         for t in templates:
             color_total = t.white + t.blue + t.black + t.red + t.green
             assert color_total == 6  # 5 base + 1 extra
@@ -187,18 +205,24 @@ class TestGenerateCardPacks:
 
     def test_returns_correct_number_of_packs(self, sample_cards):
         categorized = categorize_cards(sample_cards)
-        packs = generate_card_packs(categorized, 3, 15, unseeded=False)
+        packs = generate_card_packs(
+            categorized=categorized, num_packs=3, pack_size=15, unseeded=False
+        )
         assert len(packs) == 3
 
     def test_each_pack_has_correct_size(self, sample_cards):
         categorized = categorize_cards(sample_cards)
-        packs = generate_card_packs(categorized, 3, 15, unseeded=False)
+        packs = generate_card_packs(
+            categorized=categorized, num_packs=3, pack_size=15, unseeded=False
+        )
         for pack in packs:
             assert len(pack) == 15
 
     def test_no_duplicate_cards_across_packs(self, sample_cards):
         categorized = categorize_cards(sample_cards)
-        packs = generate_card_packs(categorized, 2, 15, unseeded=False)
+        packs = generate_card_packs(
+            categorized=categorized, num_packs=2, pack_size=15, unseeded=False
+        )
         all_names = []
         for pack in packs:
             all_names.extend(c.name for c in pack)
@@ -206,20 +230,26 @@ class TestGenerateCardPacks:
 
     def test_packs_contain_card_objects(self, sample_cards):
         categorized = categorize_cards(sample_cards)
-        packs = generate_card_packs(categorized, 1, 15, unseeded=False)
+        packs = generate_card_packs(
+            categorized=categorized, num_packs=1, pack_size=15, unseeded=False
+        )
         for card in packs[0]:
             assert isinstance(card, Card)
 
     def test_9_card_packs(self, sample_cards):
         categorized = categorize_cards(sample_cards)
-        packs = generate_card_packs(categorized, 2, 9, unseeded=False)
+        packs = generate_card_packs(
+            categorized=categorized, num_packs=2, pack_size=9, unseeded=False
+        )
         for pack in packs:
             assert len(pack) == 9
 
     def test_insufficient_cards_raises(self, sample_cards):
         categorized = categorize_cards(sample_cards)
         with pytest.raises(ValueError, match="Not enough"):
-            generate_card_packs(categorized, 100, 15, unseeded=False)
+            generate_card_packs(
+                categorized=categorized, num_packs=100, pack_size=15, unseeded=False
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -229,10 +259,18 @@ class TestGenerateCardPacks:
 
 def _write_sample_cube_csv(path: Path, num_per_color: int = 20) -> None:
     """Write a sample cube CSV with enough cards for pack generation."""
-    with open(path, "w", newline="", encoding="utf-8") as f:
+    with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(
-            ["quantity", "card name", "color", "cmc", "scryfall ID", "types", "card text"]
+            [
+                "quantity",
+                "card name",
+                "color",
+                "cmc",
+                "scryfall ID",
+                "types",
+                "card text",
+            ]
         )
         colors = ["White", "Blue", "Black", "Red", "Green"]
         idx = 0
@@ -251,9 +289,7 @@ def _write_sample_cube_csv(path: Path, num_per_color: int = 20) -> None:
         # lands
         for i in range(1, num_per_color + 1):
             idx += 1
-            writer.writerow(
-                [1, f"Land {i}", "", 0, f"id-{idx:04d}", "Land", ""]
-            )
+            writer.writerow([1, f"Land {i}", "", 0, f"id-{idx:04d}", "Land", ""])
         # fixing
         for i in range(1, 11):
             idx += 1
@@ -318,7 +354,17 @@ class TestPacksCLI:
         _write_sample_cube_csv(csv_path)
         runner = CliRunner()
         result = runner.invoke(
-            main, ["packs", "--cube", str(csv_path), "--cards", "--players", "2", "--packs", "1"]
+            main,
+            [
+                "packs",
+                "--cube",
+                str(csv_path),
+                "--cards",
+                "--players",
+                "2",
+                "--packs",
+                "1",
+            ],
         )
         assert result.exit_code == 0
         assert "Player 1" in result.output
@@ -341,7 +387,18 @@ class TestPacksCLI:
         _write_sample_cube_csv(csv_path)
         runner = CliRunner()
         result = runner.invoke(
-            main, ["packs", "--cube", str(csv_path), "--pack-size", "9", "--players", "2", "--packs", "1"]
+            main,
+            [
+                "packs",
+                "--cube",
+                str(csv_path),
+                "--pack-size",
+                "9",
+                "--players",
+                "2",
+                "--packs",
+                "1",
+            ],
         )
         assert result.exit_code == 0
 
@@ -470,53 +527,115 @@ class TestGenerateGridTemplates:
 class TestGridCLI:
     """Tests for the --grid CLI flag."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def csv_path(self, tmp_path):
         """Create a CSV with enough cards for grid draft."""
         p = tmp_path / "cube.csv"
-        rows = [["quantity", "card name", "color", "cmc", "scryfall ID", "types", "card text"]]
+        rows = [
+            [
+                "quantity",
+                "card name",
+                "color",
+                "cmc",
+                "scryfall ID",
+                "types",
+                "card text",
+            ]
+        ]
         idx = 0
         for color in ["White", "Blue", "Black", "Red", "Green"]:
             for i in range(40):
-                rows.append([1, f"{color} Card {i}", color, 2, f"id-{idx}", "Creature", ""])
+                rows.append(
+                    [1, f"{color} Card {i}", color, 2, f"id-{idx}", "Creature", ""]
+                )
                 idx += 1
         for i in range(30):
-            rows.append([1, f"Gold {i}", "White,Blue", 3, f"id-{idx}", "Creature", "multi"])
+            rows.append(
+                [1, f"Gold {i}", "White,Blue", 3, f"id-{idx}", "Creature", "multi"]
+            )
             idx += 1
         for i in range(30):
             rows.append([1, f"Land {i}", "", 0, f"id-{idx}", "Land", ""])
             idx += 1
         for i in range(15):
-            rows.append([1, f"Fixer {i}", "", 1, f"id-{idx}", "Artifact", "add one mana of any color"])
+            rows.append(
+                [
+                    1,
+                    f"Fixer {i}",
+                    "",
+                    1,
+                    f"id-{idx}",
+                    "Artifact",
+                    "add one mana of any color",
+                ]
+            )
             idx += 1
         for i in range(15):
             rows.append([1, f"Artifact {i}", "", 2, f"id-{idx}", "Artifact", "vanilla"])
             idx += 1
-        with open(p, "w", newline="") as f:
+        with p.open("w", newline="") as f:
             csv.writer(f).writerows(rows)
         return p
 
     def test_grid_2_players(self, csv_path):
         runner = CliRunner()
-        result = runner.invoke(main, ["packs", "--cube", str(csv_path), "--grid", "--players", "2", "--grids", "10"])
+        result = runner.invoke(
+            main,
+            [
+                "packs",
+                "--cube",
+                str(csv_path),
+                "--grid",
+                "--players",
+                "2",
+                "--grids",
+                "10",
+            ],
+        )
         assert result.exit_code == 0, result.output
         assert "Grid draft: 2 players" in result.output
         assert "Draw pile:" in result.output
 
     def test_grid_4_players(self, csv_path):
         runner = CliRunner()
-        result = runner.invoke(main, ["packs", "--cube", str(csv_path), "--grid", "--players", "4", "--grids", "5"])
+        result = runner.invoke(
+            main,
+            [
+                "packs",
+                "--cube",
+                str(csv_path),
+                "--grid",
+                "--players",
+                "4",
+                "--grids",
+                "5",
+            ],
+        )
         assert result.exit_code == 0, result.output
         assert "Pool 1:" in result.output
         assert "Pool 2:" in result.output
 
     def test_grid_custom_grids(self, csv_path):
         runner = CliRunner()
-        result = runner.invoke(main, ["packs", "--cube", str(csv_path), "--grid", "--players", "2", "--grids", "8"])
+        result = runner.invoke(
+            main,
+            [
+                "packs",
+                "--cube",
+                str(csv_path),
+                "--grid",
+                "--players",
+                "2",
+                "--grids",
+                "8",
+            ],
+        )
         assert result.exit_code == 0, result.output
         assert "8 grids" in result.output
 
     def test_grid_invalid_players(self, csv_path):
         runner = CliRunner()
-        result = runner.invoke(main, ["packs", "--cube", str(csv_path), "--grid", "--players", "5"])
+        result = runner.invoke(
+            main, ["packs", "--cube", str(csv_path), "--grid", "--players", "5"]
+        )
         assert result.exit_code != 0

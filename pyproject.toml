@@ -21,4 +21,36 @@ testpaths = ["tests"]
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
+    "ruff>=0.9",
+]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "D",       # pydocstyle — skip docstring enforcement
+    "ANN",     # flake8-annotations — skip type annotation enforcement
+    "ERA",     # eradicate — skip commented-out code detection
+    "FIX",     # fixme — allow TODO/FIXME comments
+    "TD",      # flake8-todos — skip TODO format enforcement
+    "S",       # bandit — skip security checks (CLI tool, not a service)
+    "INP001",  # implicit-namespace-package — no __init__.py needed everywhere
+    "T20",     # flake8-print — CLI tool uses print/click.echo
+    "TRY003",  # long exception messages are fine
+    "EM",      # exception message formatting — overly strict
+    "PLR2004", # magic values — too noisy for pack size constants
+    "COM812",  # trailing comma — conflicts with formatter
+    "ISC001",  # implicit string concat — conflicts with formatter
+    "C901",    # complexity — Click commands are inherently branchy
+    "PLR0912", # too many branches — same as above
+    "PLR0913", # too many arguments — Click commands need many params
+    "TC",      # type-checking imports — not worth the complexity
+    "PLC0415", # non-top-level import — needed to avoid circular imports
+    "ARG002",  # unused method argument — mock patches require positional args
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "SLF001",  # private member access — tests need to test internals
+    "E501",    # line length — test data and assertions can be long
+    "PERF401", # list-append-in-loop — clarity over micro-optimization in tests
 ]

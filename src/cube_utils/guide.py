@@ -140,7 +140,9 @@ THEME_PATTERNS: dict[Theme, dict[str, list[str]]] = {
 _ETB_EXCLUDE_PATTERN = "enters the battlefield tapped"
 
 
-def _card_matches_theme(card: Card, theme: Theme, patterns: dict[str, list[str]]) -> bool:
+def _card_matches_theme(
+    *, card: Card, theme: Theme, patterns: dict[str, list[str]]
+) -> bool:
     """Check if a card matches any tag, keyword, or text pattern for a theme.
 
     Uses a three-layer approach:
@@ -162,21 +164,17 @@ def _card_matches_theme(card: Card, theme: Theme, patterns: dict[str, list[str]]
     text_lower = card.text.lower()
     for pattern in patterns.get("text", []):
         if pattern.lower() in text_lower:
-            # Special handling for ETB: exclude lands entering tapped
-            if theme == Theme.ETB and _ETB_EXCLUDE_PATTERN in text_lower:
-                # Only exclude if the card is a land and the only ETB text
-                # is about entering tapped
-                if card.is_land:
-                    continue
+            # Exclude lands that just enter tapped from the ETB theme
+            if (
+                theme == Theme.ETB
+                and _ETB_EXCLUDE_PATTERN in text_lower
+                and card.is_land
+            ):
+                continue
             return True
 
-    # Layer 1b: Check produced_mana for ramp detection
-    if theme == Theme.RAMP and card.produced_mana:
-        # Cards that produce mana and aren't lands are ramp-adjacent
-        if not card.is_land and "Land" not in card.types:
-            return True
-
-    return False
+    # Layer 1b: Cards that produce mana and aren't lands are ramp-adjacent
+    return theme == Theme.RAMP and bool(card.produced_mana) and not card.is_land
 
 
 def detect_themes(cards: list[Card]) -> dict[Theme, list[Card]]:
@@ -196,7 +194,7 @@ def detect_themes(cards: list[Card]) -> dict[Theme, list[Card]]:
     result: dict[Theme, list[Card]] = {theme: [] for theme in Theme}
     for card in cards:
         for theme, patterns in THEME_PATTERNS.items():
-            if _card_matches_theme(card, theme, patterns):
+            if _card_matches_theme(card=card, theme=theme, patterns=patterns):
                 result[theme].append(card)
     return result
 
@@ -225,9 +223,7 @@ _GUILD_NAMES = {
 }
 
 _ALL_COLORS = ["Black", "Blue", "Green", "Red", "White"]
-COLOR_PAIRS: list[tuple[str, str]] = [
-    (a, b) for a, b in combinations(_ALL_COLORS, 2)
-]
+COLOR_PAIRS: list[tuple[str, str]] = [(a, b) for a, b in combinations(_ALL_COLORS, 2)]
 
 
 @dataclass
@@ -258,9 +254,7 @@ def analyze_color_pairs(
         pair_set = set(pair)
 
         # Find multicolor cards whose colors exactly match this pair
-        multicolor = [
-            c for c in cards if c.is_multicolor and set(c.colors) == pair_set
-        ]
+        multicolor = [c for c in cards if c.is_multicolor and set(c.colors) == pair_set]
 
         # Find themes where both colors contribute cards
         shared: list[Theme] = []
@@ -307,14 +301,17 @@ def find_bridge_cards(themes: dict[Theme, list[Card]]) -> list[Card]:
             card_by_name[card.name] = card
 
     bridges = [
-        card_by_name[name]
-        for name, count in card_theme_count.items()
-        if count >= 2
+        card_by_name[name] for name, count in card_theme_count.items() if count >= 2
     ]
     return sorted(bridges, key=lambda c: c.name)
 
 
 # --- Guide Markdown Output ---
+
+
+def _format_theme_name(theme: Theme) -> str:
+    """Format a Theme enum value as a title-cased string."""
+    return theme.name.replace("_", " ").title()
 
 
 def _get_guild_name(pair: tuple[str, str]) -> str:
@@ -334,6 +331,7 @@ def _themes_for_card(card: Card, themes: dict[Theme, list[Card]]) -> list[Theme]
 
 
 def generate_guide_markdown(
+    *,
     themes: dict[Theme, list[Card]],
     pairs: list[ColorPairAnalysis],
     bridges: list[Card],
@@ -360,16 +358,14 @@ def generate_guide_markdown(
         theme_cards = themes.get(theme, [])
         if not theme_cards:
             continue
-        lines.append(f"### {theme.name.replace('_', ' ').title()}")
+        lines.append(f"### {_format_theme_name(theme)}")
         lines.append("")
 
         # Group cards by color
         color_groups: dict[str, list[Card]] = {}
         for card in theme_cards:
             if card.is_multicolor:
-                key = "/".join(
-                    _get_color_abbrev(c) for c in sorted(card.colors)
-                )
+                key = "/".join(_get_color_abbrev(c) for c in sorted(card.colors))
             elif card.is_colorless:
                 key = "Colorless"
             else:
@@ -378,8 +374,7 @@ def generate_guide_markdown(
 
         for color_key in sorted(color_groups.keys()):
             lines.append(
-                f"**{color_key}:** "
-                f"{', '.join(c.name for c in color_groups[color_key])}"
+                f"**{color_key}:** {', '.join(c.name for c in color_groups[color_key])}"
             )
             lines.append("")
 
@@ -388,23 +383,18 @@ def generate_guide_markdown(
     lines.append("")
     for pair_analysis in pairs:
         guild = _get_guild_name(pair_analysis.colors)
-        abbrevs = "/".join(
-            _get_color_abbrev(c) for c in pair_analysis.colors
-        )
+        abbrevs = "/".join(_get_color_abbrev(c) for c in pair_analysis.colors)
         lines.append(f"### {guild} ({abbrevs})")
         lines.append("")
 
         if pair_analysis.multicolor_cards:
-            gold_names = ", ".join(
-                c.name for c in pair_analysis.multicolor_cards
-            )
+            gold_names = ", ".join(c.name for c in pair_analysis.multicolor_cards)
             lines.append(f"**Gold cards:** {gold_names}")
             lines.append("")
 
         if pair_analysis.shared_themes:
             theme_names = ", ".join(
-                t.name.replace("_", " ").title()
-                for t in pair_analysis.shared_themes
+                _format_theme_name(t) for t in pair_analysis.shared_themes
             )
             lines.append(f"**Shared themes:** {theme_names}")
             lines.append("")
@@ -413,10 +403,7 @@ def generate_guide_markdown(
                 cards_for_theme = pair_analysis.theme_cards.get(theme, [])
                 if cards_for_theme:
                     card_names = ", ".join(c.name for c in cards_for_theme)
-                    lines.append(
-                        f"- {theme.name.replace('_', ' ').title()}: "
-                        f"{card_names}"
-                    )
+                    lines.append(f"- {_format_theme_name(theme)}: {card_names}")
             lines.append("")
 
     # Bridge Cards section
@@ -425,9 +412,7 @@ def generate_guide_markdown(
     if bridges:
         for card in bridges:
             card_themes = _themes_for_card(card, themes)
-            theme_names = ", ".join(
-                t.name.replace("_", " ").title() for t in card_themes
-            )
+            theme_names = ", ".join(_format_theme_name(t) for t in card_themes)
             lines.append(f"- **{card.name}**: {theme_names}")
         lines.append("")
 

@@ -1,12 +1,9 @@
 """Tests for Scryfall oracle tag fetcher."""
 
 import json
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from cube_utils.tags import (
-    DEFAULT_CACHE_PATH,
-    RELEVANT_TAGS,
     _fetch_tag_oracle_ids,
     fetch_tags,
     load_tags,
@@ -77,7 +74,7 @@ class TestFetchTags:
         mock_fetch.return_value = ["oid-1", "oid-2"]
         cache_path = tmp_path / "cache.json"
 
-        result = fetch_tags(tags=["removal", "ramp"], cache_path=cache_path)
+        fetch_tags(tags=["removal", "ramp"], cache_path=cache_path)
 
         assert cache_path.exists()
         data = json.loads(cache_path.read_text())
