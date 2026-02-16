@@ -35,7 +35,7 @@ def sample_csv(tmp_path: Path) -> Path:
 @pytest.fixture
 def real_cube_path() -> Path:
     """Path to the real cube CSV file."""
-    return Path(__file__).parent.parent / "cube-2.csv"
+    return Path(__file__).parent.parent / "regular-cube.csv"
 
 
 @pytest.fixture

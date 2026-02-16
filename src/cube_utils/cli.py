@@ -90,7 +90,7 @@ def main():
 @click.option(
     "--cube",
     "cube_path",
-    default="cube-2.csv",
+    default="regular-cube.csv",
     type=click.Path(exists=True),
     help="Path to the cube CSV file.",
 )
@@ -279,7 +279,7 @@ def fetch_tags_cmd(output_path):
 @click.option(
     "--cube",
     "cube_path",
-    default="cube-2.csv",
+    default="regular-cube.csv",
     type=click.Path(exists=True),
 )
 @click.option(
