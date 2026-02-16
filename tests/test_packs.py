@@ -659,3 +659,106 @@ class TestGridCLI:
             main, ["packs", "--cube", str(csv_path), "--grid", "--players", "5"]
         )
         assert result.exit_code != 0
+
+
+class TestUnseededTemplateCLI:
+    """Tests for --unseeded flag in template mode."""
+
+    def test_unseeded_template_mode_succeeds(self, tmp_path):
+        csv_path = tmp_path / "cube.csv"
+        _write_sample_cube_csv(csv_path)
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "packs",
+                "--cube",
+                str(csv_path),
+                "--unseeded",
+                "--players",
+                "2",
+                "--packs",
+                "1",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Player 1" in result.output
+        assert "Player 2" in result.output
+
+    def test_unseeded_template_totals_correct(self, tmp_path):
+        csv_path = tmp_path / "cube.csv"
+        _write_sample_cube_csv(csv_path)
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "packs",
+                "--cube",
+                str(csv_path),
+                "--unseeded",
+                "--players",
+                "2",
+                "--packs",
+                "1",
+            ],
+        )
+        assert result.exit_code == 0
+        # Should contain category labels like seeded mode
+        assert "multi" in result.output
+        assert "land" in result.output
+
+    def test_unseeded_arbitrary_pack_size(self, tmp_path):
+        csv_path = tmp_path / "cube.csv"
+        _write_sample_cube_csv(csv_path)
+        runner = CliRunner()
+        result = runner.invoke(
+            main,
+            [
+                "packs",
+                "--cube",
+                str(csv_path),
+                "--unseeded",
+                "--players",
+                "2",
+                "--packs",
+                "1",
+                "--pack-size",
+                "13",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Player 1" in result.output
+
+    def test_unseeded_varies_from_seeded(self, tmp_path):
+        """Unseeded packs should not always have exactly 1 fixing card."""
+        import random
+        import re
+
+        csv_path = tmp_path / "cube.csv"
+        _write_sample_cube_csv(csv_path)
+        runner = CliRunner()
+
+        # Run multiple times and check that fixing count varies
+        fixing_counts = set()
+        for seed in range(20):
+            random.seed(seed)
+            result = runner.invoke(
+                main,
+                [
+                    "packs",
+                    "--cube",
+                    str(csv_path),
+                    "--unseeded",
+                    "--players",
+                    "1",
+                    "--packs",
+                    "1",
+                ],
+            )
+            assert result.exit_code == 0
+            match = re.search(r"(\d+)fixing", result.output)
+            assert match is not None
+            fixing_counts.add(int(match.group(1)))
+
+        # With proportional distribution, fixing should vary (not always 1)
+        assert len(fixing_counts) > 1, f"Fixing count was always {fixing_counts}"

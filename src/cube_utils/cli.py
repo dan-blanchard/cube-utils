@@ -20,6 +20,7 @@ from cube_utils.packs import (
     generate_grid_templates,
     generate_pack_templates,
     get_pack_structure,
+    packs_to_templates,
 )
 from cube_utils.tags import fetch_tags
 
@@ -168,11 +169,12 @@ def packs(
         )
         return
 
-    # Validate pack size
-    try:
-        get_pack_structure(pack_size)
-    except ValueError as e:
-        raise click.ClickException(str(e)) from None
+    # Validate pack size (only needed for seeded mode)
+    if not unseeded:
+        try:
+            get_pack_structure(pack_size)
+        except ValueError as e:
+            raise click.ClickException(str(e)) from None
 
     total_packs = players * num_packs
     total_cards_needed = total_packs * pack_size
@@ -204,7 +206,18 @@ def packs(
 
         output_text = "\n\n".join(output_parts) + "\n"
     else:
-        templates = generate_pack_templates(num_packs=total_packs, pack_size=pack_size)
+        if unseeded:
+            all_packs = generate_card_packs(
+                categorized=categorized,
+                num_packs=total_packs,
+                pack_size=pack_size,
+                unseeded=True,
+            )
+            templates = packs_to_templates(all_packs)
+        else:
+            templates = generate_pack_templates(
+                num_packs=total_packs, pack_size=pack_size
+            )
 
         output_parts = []
         for player_idx in range(players):
