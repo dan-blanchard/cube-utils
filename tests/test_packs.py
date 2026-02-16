@@ -14,6 +14,7 @@ from cube_utils.packs import (
     generate_grid_templates,
     generate_pack_templates,
     get_pack_structure,
+    packs_to_templates,
 )
 
 # ---------------------------------------------------------------------------
@@ -471,6 +472,25 @@ class TestPacksCLI:
         # Files should contain card names
         content = files[0].read_text()
         assert "Card" in content or "Gold" in content or "Land" in content
+
+
+# ---------------------------------------------------------------------------
+# packs_to_templates helper
+# ---------------------------------------------------------------------------
+
+
+class TestPacksToTemplates:
+    """Tests for packs_to_templates helper."""
+
+    def test_converts_packs_to_templates(self, sample_cards):
+        categorized = categorize_cards(sample_cards)
+        packs = generate_card_packs(
+            categorized=categorized, num_packs=2, pack_size=9, unseeded=True
+        )
+        templates = packs_to_templates(packs)
+        assert len(templates) == 2
+        for t in templates:
+            assert t.total() == 9
 
 
 # ---------------------------------------------------------------------------

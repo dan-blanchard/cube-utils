@@ -161,6 +161,46 @@ def generate_pack_templates(*, num_packs: int, pack_size: int) -> list[PackTempl
 
 _DEFAULT_GRIDS = 18
 
+_CATEGORY_FOR_COLOR = {
+    "white": Category.MONO_WHITE,
+    "blue": Category.MONO_BLUE,
+    "black": Category.MONO_BLACK,
+    "red": Category.MONO_RED,
+    "green": Category.MONO_GREEN,
+}
+
+# Maps PackTemplate attribute names to their Category, used for drawing cards
+# and accumulating grid template counts.
+_ATTR_TO_CATEGORY = {
+    **_CATEGORY_FOR_COLOR,
+    "colorless": Category.COLORLESS,
+    "multicolor": Category.MULTICOLOR,
+    "land": Category.LAND,
+    "fixing": Category.FIXING,
+}
+
+
+def packs_to_templates(packs: list[list[Card]]) -> list[PackTemplate]:
+    """Convert card packs into PackTemplates by counting categories.
+
+    Args:
+        packs: List of packs, where each pack is a list of Card.
+
+    Returns:
+        List of PackTemplate with per-category counts matching each pack.
+    """
+    templates: list[PackTemplate] = []
+    for pack in packs:
+        categorized_pack = categorize_cards(pack)
+        template = PackTemplate(
+            **{
+                attr: len(categorized_pack[cat])
+                for attr, cat in _ATTR_TO_CATEGORY.items()
+            }
+        )
+        templates.append(template)
+    return templates
+
 
 def generate_grid_templates(
     *,
@@ -208,36 +248,16 @@ def generate_grid_templates(
     )
 
     for i in range(num_pools):
-        # Convert packs to templates and sum them into one pool template
         packs_for_pool = packs[i * num_grids : (i + 1) * num_grids]
+        pool_template_list = packs_to_templates(packs_for_pool)
 
         pool = PackTemplate(**dict.fromkeys(_ATTR_TO_CATEGORY, 0))
-        for pack in packs_for_pool:
-            categorized_pack = categorize_cards(pack)
-            for attr, cat in _ATTR_TO_CATEGORY.items():
-                setattr(pool, attr, getattr(pool, attr) + len(categorized_pack[cat]))
+        for t in pool_template_list:
+            for attr in _ATTR_TO_CATEGORY:
+                setattr(pool, attr, getattr(pool, attr) + getattr(t, attr))
         pool_templates.append(pool)
 
     return pool_templates
-
-
-_CATEGORY_FOR_COLOR = {
-    "white": Category.MONO_WHITE,
-    "blue": Category.MONO_BLUE,
-    "black": Category.MONO_BLACK,
-    "red": Category.MONO_RED,
-    "green": Category.MONO_GREEN,
-}
-
-# Maps PackTemplate attribute names to their Category, used for drawing cards
-# and accumulating grid template counts.
-_ATTR_TO_CATEGORY = {
-    **_CATEGORY_FOR_COLOR,
-    "colorless": Category.COLORLESS,
-    "multicolor": Category.MULTICOLOR,
-    "land": Category.LAND,
-    "fixing": Category.FIXING,
-}
 
 
 def generate_card_packs(
