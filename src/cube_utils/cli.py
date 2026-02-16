@@ -160,14 +160,18 @@ def packs(
     unseeded,
 ):
     """Generate draft packs."""
+    cards = load_cube(Path(cube_path))
+    categorized = categorize_cards(cards)
+
+    if grid_mode:
+        _handle_grid_draft(players, num_grids, categorized)
+        return
+
     # Validate pack size
     try:
         get_pack_structure(pack_size)
     except ValueError as e:
         raise click.ClickException(str(e))
-
-    cards = load_cube(Path(cube_path))
-    categorized = categorize_cards(cards)
 
     total_packs = players * num_packs
     total_cards_needed = total_packs * pack_size
@@ -176,10 +180,6 @@ def packs(
         raise click.ClickException(
             f"Not enough cards: need {total_cards_needed} but cube has {len(cards)}"
         )
-
-    if grid_mode:
-        _handle_grid_draft(players, num_grids, categorized)
-        return
 
     if cards_mode:
         try:

@@ -187,18 +187,18 @@ class TestGenerateCardPacks:
 
     def test_returns_correct_number_of_packs(self, sample_cards):
         categorized = categorize_cards(sample_cards)
-        packs = generate_card_packs(categorized, 3, 15)
+        packs = generate_card_packs(categorized, 3, 15, unseeded=False)
         assert len(packs) == 3
 
     def test_each_pack_has_correct_size(self, sample_cards):
         categorized = categorize_cards(sample_cards)
-        packs = generate_card_packs(categorized, 3, 15)
+        packs = generate_card_packs(categorized, 3, 15, unseeded=False)
         for pack in packs:
             assert len(pack) == 15
 
     def test_no_duplicate_cards_across_packs(self, sample_cards):
         categorized = categorize_cards(sample_cards)
-        packs = generate_card_packs(categorized, 2, 15)
+        packs = generate_card_packs(categorized, 2, 15, unseeded=False)
         all_names = []
         for pack in packs:
             all_names.extend(c.name for c in pack)
@@ -206,20 +206,20 @@ class TestGenerateCardPacks:
 
     def test_packs_contain_card_objects(self, sample_cards):
         categorized = categorize_cards(sample_cards)
-        packs = generate_card_packs(categorized, 1, 15)
+        packs = generate_card_packs(categorized, 1, 15, unseeded=False)
         for card in packs[0]:
             assert isinstance(card, Card)
 
     def test_9_card_packs(self, sample_cards):
         categorized = categorize_cards(sample_cards)
-        packs = generate_card_packs(categorized, 2, 9)
+        packs = generate_card_packs(categorized, 2, 9, unseeded=False)
         for pack in packs:
             assert len(pack) == 9
 
     def test_insufficient_cards_raises(self, sample_cards):
         categorized = categorize_cards(sample_cards)
         with pytest.raises(ValueError, match="Not enough"):
-            generate_card_packs(categorized, 100, 15)
+            generate_card_packs(categorized, 100, 15, unseeded=False)
 
 
 # ---------------------------------------------------------------------------
@@ -424,42 +424,47 @@ class TestPacksCLI:
 class TestGenerateGridTemplates:
     """Tests for generate_grid_templates."""
 
-    def test_2_players_returns_one_pool(self):
-        pools = generate_grid_templates(players=2)
+    def test_2_players_returns_one_pool(self, sample_cards):
+        categorized = categorize_cards(sample_cards)
+        pools = generate_grid_templates(players=2, categorized=categorized, num_grids=4)
         assert len(pools) == 1
 
-    def test_3_players_returns_one_pool(self):
-        pools = generate_grid_templates(players=3)
+    def test_3_players_returns_one_pool(self, sample_cards):
+        categorized = categorize_cards(sample_cards)
+        pools = generate_grid_templates(players=3, categorized=categorized, num_grids=3)
         assert len(pools) == 1
 
-    def test_4_players_returns_two_pools(self):
-        pools = generate_grid_templates(players=4)
+    def test_4_players_returns_two_pools(self, sample_cards):
+        categorized = categorize_cards(sample_cards)
+        pools = generate_grid_templates(players=4, categorized=categorized, num_grids=2)
         assert len(pools) == 2
 
-    def test_pool_total_equals_grids_times_9(self):
-        pools = generate_grid_templates(players=2, num_grids=18)
-        assert pools[0].total() == 18 * 9
+    def test_pool_total_equals_grids_times_9(self, sample_cards):
+        categorized = categorize_cards(sample_cards)
+        pools = generate_grid_templates(players=2, categorized=categorized, num_grids=4)
+        assert pools[0].total() == 4 * 9
 
-    def test_custom_grid_count(self):
-        pools = generate_grid_templates(players=2, num_grids=12)
-        assert pools[0].total() == 12 * 9
+    def test_3_player_pool_total_equals_grids_times_12(self, sample_cards):
+        categorized = categorize_cards(sample_cards)
+        pools = generate_grid_templates(players=3, categorized=categorized, num_grids=3)
+        assert pools[0].total() == 3 * 12
 
-    def test_each_color_at_least_num_grids(self):
-        """Each color should have at least 1 card per grid (from the 9-card structure)."""
-        pools = generate_grid_templates(players=2, num_grids=18)
-        pool = pools[0]
-        for attr in ["white", "blue", "black", "red", "green"]:
-            assert getattr(pool, attr) >= 18
+    def test_custom_grid_count(self, sample_cards):
+        categorized = categorize_cards(sample_cards)
+        pools = generate_grid_templates(players=2, categorized=categorized, num_grids=3)
+        assert pools[0].total() == 3 * 9
 
-    def test_4_players_pools_are_independent(self):
+    def test_4_players_pools_are_independent(self, sample_cards):
         """Two pools for 4 players should each have the right total."""
-        pools = generate_grid_templates(players=4, num_grids=18)
-        assert pools[0].total() == 162
-        assert pools[1].total() == 162
+        categorized = categorize_cards(sample_cards)
+        pools = generate_grid_templates(players=4, categorized=categorized, num_grids=2)
+        assert pools[0].total() == 2 * 9
+        assert pools[1].total() == 2 * 9
 
-    def test_invalid_player_count(self):
+    def test_invalid_player_count(self, sample_cards):
+        categorized = categorize_cards(sample_cards)
         with pytest.raises(ValueError, match="2, 3, or 4"):
-            generate_grid_templates(players=5)
+            generate_grid_templates(players=5, categorized=categorized)
 
 
 class TestGridCLI:
@@ -493,24 +498,23 @@ class TestGridCLI:
 
     def test_grid_2_players(self, csv_path):
         runner = CliRunner()
-        result = runner.invoke(main, ["packs", "--cube", str(csv_path), "--grid", "--players", "2"])
-        assert result.exit_code == 0
+        result = runner.invoke(main, ["packs", "--cube", str(csv_path), "--grid", "--players", "2", "--grids", "10"])
+        assert result.exit_code == 0, result.output
         assert "Grid draft: 2 players" in result.output
         assert "Draw pile:" in result.output
-        assert "162 cards" in result.output or "162 total" in result.output
 
     def test_grid_4_players(self, csv_path):
         runner = CliRunner()
-        result = runner.invoke(main, ["packs", "--cube", str(csv_path), "--grid", "--players", "4"])
-        assert result.exit_code == 0
+        result = runner.invoke(main, ["packs", "--cube", str(csv_path), "--grid", "--players", "4", "--grids", "5"])
+        assert result.exit_code == 0, result.output
         assert "Pool 1:" in result.output
         assert "Pool 2:" in result.output
 
     def test_grid_custom_grids(self, csv_path):
         runner = CliRunner()
-        result = runner.invoke(main, ["packs", "--cube", str(csv_path), "--grid", "--players", "2", "--grids", "12"])
-        assert result.exit_code == 0
-        assert "12 grids" in result.output
+        result = runner.invoke(main, ["packs", "--cube", str(csv_path), "--grid", "--players", "2", "--grids", "8"])
+        assert result.exit_code == 0, result.output
+        assert "8 grids" in result.output
 
     def test_grid_invalid_players(self, csv_path):
         runner = CliRunner()

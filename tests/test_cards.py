@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from cube_utils.cards import (
     Card,
     Category,
